@@ -1,0 +1,64 @@
+{
+    "services": [
+        {
+            "name": "Authentik",
+            "subdomain": "auth"
+        },
+        {
+            "name": "Duplicati",
+            "subdomain": "backup"
+        },
+        {
+            "name": "Nextcloud",
+            "subdomain": "cloud"
+        },
+        {
+            "name": "Home Assistant",
+            "subdomain": "ha"
+        },
+        {
+            "name": "Homepage",
+            "subdomain": ""
+        },
+        {
+            "name": "n8n",
+            "subdomain": "n8n"
+        },
+        {
+            "name": "Sabnzbd+",
+            "subdomain": "nzb"
+        },
+        {
+            "name": "Nzbhydra2",
+            "subdomain": "nzbhydra"
+        },
+        {
+            "name": "Immich",
+            "subdomain": "photos"
+        },
+        {
+            "name": "Plex",
+            "subdomain": "plex"
+        },
+        {
+            "name": "Radarr",
+            "subdomain": "radarr"
+        },
+        {
+            "name": "Overseerr",
+            "subdomain": "requests"
+        },
+        {
+            "name": "Sonarr",
+            "subdomain": "sonarr"
+        },
+        {
+            "name": "Tautulli",
+            "subdomain": "tt"
+        },
+        {
+            "name": "Unraid",
+            "subdomain": "unraid"
+        }
+    ]
+}
