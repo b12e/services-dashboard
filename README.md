@@ -15,13 +15,11 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 - 📱 **Responsive**: Adapts beautifully to any screen size
 - 🔗 **Smart URL Display**: Toggle URLs on/off with persistent preferences
 - ⚡ **Fast Loading**: Service worker caches all assets for instant loads
+- Built with vanilla JavaScript, HTML5, and CSS3
 
 ## Quick Start
 
-1. **Download the files**:
-   - `index.html` - Main dashboard page
-   - `service-worker.js` - PWA service worker
-   - `manifest.json` - PWA manifest
+1. **Download the files**.
 
 2. **Create your `services.json`**:
 ```json
@@ -43,7 +41,7 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 }
 ```
 
-3. **Optional: Create `configuration.json`**:
+1. **Optional: Create `configuration.json`**:
 ```json
 {
     "baseUrl": "local.b12e.es",
@@ -51,7 +49,7 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 }
 ```
 
-4. **Serve the files** over HTTPS (required for PWA features)
+1. **Serve the files** over HTTPS (required for PWA features)
 
 ## Configuration
 
@@ -130,6 +128,8 @@ Optional configuration file to customize the dashboard behavior:
     "showUrlsByDefault": false
 }
 ```
+
+**Note:** If `baseUrl` is not set, services must provide complete domains in their `url` field or set `appendBaseDomain: false`.
 
 ## Icons
 
@@ -240,8 +240,7 @@ This dashboard is open source and available for personal and commercial use.
 ## Credits
 
 - Icons provided by [dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
-- Built with vanilla JavaScript, HTML5, and CSS3
-- PWA capabilities using Service Workers
+
 
 ## Contributing
 
