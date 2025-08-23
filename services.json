@@ -59,21 +59,6 @@
         {
             "name": "Unraid",
             "url": "unraid"
-        },
-        {
-            "name": "El Pais",
-            "url": "https://elpais.es",
-            "appendBaseDomain": false
-        },
-         {
-            "name": "Google",
-            "url": "google.com",
-            "appendBaseDomain": false
-        },
-         {
-            "name": "Invalid URL",
-            "url": "invalid url .nl",
-            "appendBaseDomain": false
         }
     ]
 }
