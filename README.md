@@ -44,7 +44,7 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 1. **Optional: Create `configuration.json`**:
 ```json
 {
-    "baseUrl": "local.b12e.es",
+    "baseUrl": "home.local",
     "showUrlsByDefault": false
 }
 ```
@@ -68,8 +68,8 @@ The `services.json` file defines all your services. Each service requires:
 The `url` field behavior depends on your configuration:
 
 1. **With base domain + appendBaseDomain true (default)**:
-   - `url: "cloud"` + `baseUrl: "local.b12e.es"` → `https://cloud.local.b12e.es`
-   - `url: ""` + `baseUrl: "local.b12e.es"` → `https://local.b12e.es`
+   - `url: "cloud"` + `baseUrl: "local.home.local"` → `https://cloud.home.local`
+   - `url: ""` + `baseUrl: "local.home.local"` → `https://local.home.local`
 
 2. **With appendBaseDomain false**:
    - `url: "google.com"` → `https://google.com` (https:// added automatically)
@@ -118,7 +118,7 @@ Optional configuration file to customize the dashboard behavior:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `baseUrl` | string | `"local.b12e.es"` | Your base domain for all services |
+| `baseUrl` | string | `"local.home.local"` | Your base domain for all services |
 | `showUrlsByDefault` | boolean | `true` on desktop, `false` on mobile | Whether to show URLs under service names by default |
 
 **Example configuration.json:**
@@ -265,3 +265,7 @@ Feel free to submit issues, fork the repository, and create pull requests for an
 - rename `subdomain` to `url` in services.json
 - Support full URLs with protocol as well as domain names when `appendBaseDomain` is set to `false`
 - Handle invalid URLs properly
+
+### Version 1.0.2
+- Update title
+- Always show full service name
