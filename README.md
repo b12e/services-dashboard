@@ -62,39 +62,57 @@ The `services.json` file defines all your services. Each service requires:
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
 | `name` | string | Display name of the service | `"Nextcloud"` |
-| `subdomain` | string | Subdomain for the service (empty for base domain) | `"cloud"` or `""` |
+| `url` | string | The URL portion for the service (see URL Generation below) | `"cloud"` or `"nextcloud.example.com"` |
+| `appendBaseDomain` | boolean | Whether to append the base domain (optional, defaults to `true`) | `false` |
 
-**Example with various services:**
+**URL Generation Logic:**
+
+The `url` field behavior depends on your configuration:
+
+1. **With base domain + appendBaseDomain true (default)**:
+   - `url: "cloud"` + `baseUrl: "local.b12e.es"` → `https://cloud.local.b12e.es`
+   - `url: ""` + `baseUrl: "local.b12e.es"` → `https://local.b12e.es`
+
+2. **With appendBaseDomain false**:
+   - `url: "google.com"` → `https://google.com` (https:// added automatically)
+   - `url: "https://google.com"` → `https://google.com` (protocol preserved)
+   - `url: "http://192.168.1.100:8080"` → `http://192.168.1.100:8080` (protocol preserved)
+   - `url: "nextcloud.example.com"` → `https://nextcloud.example.com` (https:// added)
+
+**Example with various configurations:**
 ```json
 {
     "services": [
         {
             "name": "Authentik",
-            "subdomain": "auth"
+            "url": "auth"
         },
         {
             "name": "Nextcloud", 
-            "subdomain": "cloud"
+            "url": "cloud"
         },
         {
-            "name": "Home Assistant",
-            "subdomain": "ha"
+            "name": "Google",
+            "url": "google.com",
+            "appendBaseDomain": false
         },
         {
-            "name": "Plex",
-            "subdomain": "plex"
+            "name": "External Service",
+            "url": "https://app.external-domain.com",
+            "appendBaseDomain": false
+        },
+        {
+            "name": "Local HTTP Service",
+            "url": "http://192.168.1.100:8080",
+            "appendBaseDomain": false
         },
         {
             "name": "Homepage",
-            "subdomain": ""
+            "url": ""
         }
     ]
 }
 ```
-
-**URL Generation:**
-- Service with subdomain: `https://{subdomain}.{baseUrl}` → `https://cloud.local.b12e.es`
-- Service without subdomain: `https://{baseUrl}` → `https://local.b12e.es`
 
 ### configuration.json Options
 
@@ -151,11 +169,7 @@ The service worker provides:
 
 ### Required Icon Files
 
-For full PWA support, create these icon files:
-- `icon-32.png` - Browser favicon
-- `icon-72.png`, `icon-96.png`, `icon-128.png`, `icon-144.png`, `icon-152.png` - Various mobile devices
-- `icon-180.png` - Apple devices
-- `icon-192.png`, `icon-384.png`, `icon-512.png` - Android and PWA
+For full PWA support, create a vector icon (.svg) and place it in the root folder as `icon.svg`.
 
 ## Deployment
 
@@ -164,40 +178,6 @@ For full PWA support, create these icon files:
 - **HTTPS**: Required for service worker and PWA features
 - **Web server**: Any static file server (nginx, Apache, Caddy, etc.)
 - **Modern browser**: Chrome, Firefox, Safari, Edge (latest versions)
-
-### Example Nginx Configuration
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name dashboard.local.b12e.es;
-    
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    root /var/www/dashboard;
-    index index.html;
-    
-    # Cache static assets
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|json)$ {
-        expires 1d;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM nginx:alpine
-COPY . /usr/share/nginx/html
-EXPOSE 80
-```
-
-```bash
-docker build -t services-dashboard .
-docker run -d -p 8080:80 services-dashboard
-```
 
 ## Features in Detail
 
@@ -276,3 +256,13 @@ Feel free to submit issues, fork the repository, and create pull requests for an
 - Configurable base URL and URL visibility
 - Responsive design
 - Service worker caching
+
+### Version 1.0.1
+- Open links in new window when used as PWA
+- Fix service name visibility on narrow screens
+- Fix service URL visibility on narrow screens
+- Move style into style.css and JS into base.js
+- Add possibility to not add base URL
+- rename `subdomain` to `url` in services.json
+- Support full URLs with protocol as well as domain names when `appendBaseDomain` is set to `false`
+- Handle invalid URLs properly

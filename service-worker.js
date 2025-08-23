@@ -6,8 +6,11 @@ const IMAGE_CACHE_NAME = 'services-images-v1';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
+    '/style.css',
+    '/base.js',
     '/services.json',
-    '/manifest.json'
+    '/manifest.json',
+    '/configuration.json'
 ];
 
 // Install event - cache static assets

@@ -2,63 +2,78 @@
     "services": [
         {
             "name": "Authentik",
-            "subdomain": "auth"
+            "url": "auth"
         },
         {
             "name": "Duplicati",
-            "subdomain": "backup"
+            "url": "backup"
         },
         {
             "name": "Nextcloud",
-            "subdomain": "cloud"
+            "url": "cloud"
         },
         {
             "name": "Home Assistant",
-            "subdomain": "ha"
+            "url": "ha"
         },
         {
             "name": "Homepage",
-            "subdomain": ""
+            "url": ""
         },
         {
             "name": "n8n",
-            "subdomain": "n8n"
+            "url": "n8n"
         },
         {
             "name": "Sabnzbd+",
-            "subdomain": "nzb"
+            "url": "nzb"
         },
         {
             "name": "Nzbhydra2",
-            "subdomain": "nzbhydra"
+            "url": "nzbhydra"
         },
         {
             "name": "Immich",
-            "subdomain": "photos"
+            "url": "photos"
         },
         {
             "name": "Plex",
-            "subdomain": "plex"
+            "url": "plex"
         },
         {
             "name": "Radarr",
-            "subdomain": "radarr"
+            "url": "radarr"
         },
         {
             "name": "Overseerr",
-            "subdomain": "requests"
+            "url": "requests"
         },
         {
             "name": "Sonarr",
-            "subdomain": "sonarr"
+            "url": "sonarr"
         },
         {
             "name": "Tautulli",
-            "subdomain": "tt"
+            "url": "tt"
         },
         {
             "name": "Unraid",
-            "subdomain": "unraid"
+            "url": "unraid"
+        },
+        {
+            "name": "El Pais",
+            "url": "https://elpais.es",
+            "appendBaseDomain": false
+        },
+         {
+            "name": "Google.com",
+            "url": "google.com",
+            "appendBaseDomain": false
+        },
+         {
+            "name": "Invalid URL",
+            "url": "invalid url .nl",
+            "appendBaseDomain": false
         }
     ]
 }
