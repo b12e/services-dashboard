@@ -27,15 +27,15 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
     "services": [
         {
             "name": "Nextcloud",
-            "subdomain": "cloud"
+            "url": "cloud"
         },
         {
             "name": "Home Assistant",
-            "subdomain": "ha"
+            "url": "ha"
         },
         {
             "name": "Homepage",
-            "subdomain": ""
+            "url": ""
         }
     ]
 }
