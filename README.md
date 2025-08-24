@@ -52,35 +52,33 @@ Desktop:
     ```
 
 2. Create your `services.json`:
-```json
-{
-    "services": [
-        {
-            "name": "Nextcloud",
-            "url": "cloud"
-        },
-        {
-            "name": "Home Assistant",
-            "url": "ha"
-        },
-        {
-            "name": "Homepage",
-            "url": ""
-        }
-    ]
-}
-```
+    ```json
+    {   
+        "services": [
+            {
+                "name": "Nextcloud",
+                "url": "cloud"
+            },
+            {
+                "name": "Home Assistant",
+                "url": "ha"
+            },
+            {
+                "name": "Homepage",
+                "url": ""
+            }
+        ]
+    }
+    ```
 
 
-3. Create `configuration.json`**:
-```json
-{
-    "baseUrl": "home.local",
-    "showUrlsByDefault": false
-}
-```
-
-**Warning**: If you want to use it as a PWA, you'll need to serve the page over HTTPS.
+3. Create `configuration.json`:
+    ```json
+    {
+        "baseUrl": "home.local",
+        "showUrlsByDefault": false
+    }
+    ```
 
 ## Configuration
 
@@ -189,6 +187,8 @@ To use custom icons, you'll need to contribute them to the [dashboard-icons](htt
 Users can install the dashboard as an app:
 - **Mobile**: Tap "Add to Home Screen" in browser menu
 - **Desktop**: Click install icon in address bar (Chrome/Edge) or the share icon -> Add to Dock (Safari)
+
+**Warning**: If you want to use it as a PWA, you'll need to serve the page over HTTPS.
 
 ### Required Icon Files
 
