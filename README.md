@@ -9,6 +9,8 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 ## Screenshots
 Desktop:
 <img width="1633" height="974" alt="image" src="https://github.com/user-attachments/assets/f4b8ee13-49e5-4301-8c3b-db6952e4e23a" />
+<img width="2308" height="1682" alt="image" src="https://github.com/user-attachments/assets/b7f7f283-65e0-4abb-befe-f4bbf29729bf" />
+
 
 ## Features
 
