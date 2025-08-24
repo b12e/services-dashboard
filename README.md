@@ -6,6 +6,10 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 ![Offline Support](https://img.shields.io/badge/Offline-Supported-green)
 ![Dark Mode](https://img.shields.io/badge/Dark-Mode-black)
 
+## Screenshots
+Desktop:
+<img width="1633" height="974" alt="image" src="https://github.com/user-attachments/assets/f4b8ee13-49e5-4301-8c3b-db6952e4e23a" />
+
 ## Features
 
 - 🌙 **Dark Mode**: Sleek dark theme with glassmorphism effects
