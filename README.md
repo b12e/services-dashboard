@@ -71,6 +71,7 @@ Desktop:
 }
 ```
 
+
 3. Create `configuration.json`**:
 ```json
 {
@@ -79,7 +80,7 @@ Desktop:
 }
 ```
 
-4. **Serve the files** over HTTPS (required for PWA features)
+**Warning**: If you want to use it as a PWA, you'll need to serve the page over HTTPS.
 
 ## Configuration
 
@@ -187,27 +188,11 @@ To use custom icons, you'll need to contribute them to the [dashboard-icons](htt
 
 Users can install the dashboard as an app:
 - **Mobile**: Tap "Add to Home Screen" in browser menu
-- **Desktop**: Click install icon in address bar (Chrome/Edge)
-
-### Offline Support
-
-The service worker provides:
-- **Cached icons**: All icons are cached after first load
-- **Offline access**: Dashboard works without internet connection
-- **Background updates**: Services list updates when back online
-- **Smart caching**: Different strategies for different resource types
+- **Desktop**: Click install icon in address bar (Chrome/Edge) or the share icon -> Add to Dock (Safari)
 
 ### Required Icon Files
 
 For full PWA support, create a vector icon (.svg) and place it in the root folder as `icon.svg`. You can also modify manifest.json to your own liking.
-
-## Deployment
-
-### Requirements
-
-- **HTTPS**: Required for service worker and PWA features
-- **Web server**: Any static file server (nginx, Apache, Caddy, etc.)
-- **Modern browser**: Chrome, Firefox, Safari, Edge (latest versions)
 
 ## Features in Detail
 
@@ -219,12 +204,6 @@ For full PWA support, create a vector icon (.svg) and place it in the root folde
   - Visible on desktop
   - Configurable via `configuration.json`
 - **Persistent**: Choice saved in browser localStorage
-
-### Responsive Design
-
-- **Desktop**: Grid layout with hover effects
-- **Mobile**: Compact grid, smaller icons, hidden URLs by default
-- **Tablet**: Adaptive layout between mobile and desktop
 
 ### Dark Theme
 
@@ -257,11 +236,7 @@ For full PWA support, create a vector icon (.svg) and place it in the root folde
 
 ## Browser Support
 
-- ✅ Chrome/Chromium 90+
-- ✅ Firefox 89+
-- ✅ Safari 14+
-- ✅ Edge 90+
-- ✅ Mobile browsers (iOS Safari, Chrome Mobile)
+All modern web browsers are supported.
 
 ## License
 
@@ -299,3 +274,6 @@ Feel free to submit issues, fork the repository, and create pull requests for an
 ### Version 1.0.2
 - Update title
 - Always show full service name
+
+### Version 1.0.3
+- Updated icon and readme
