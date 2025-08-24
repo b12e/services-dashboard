@@ -67,14 +67,14 @@ The `services.json` file defines all your services. Each service requires:
 
 The `url` field behavior depends on your configuration:
 
-1. **With base domain + appendBaseDomain true (default)**:
-   - `url: "cloud"` + `baseUrl: "local.home.local"` → `https://cloud.home.local`
-   - `url: ""` + `baseUrl: "local.home.local"` → `https://local.home.local`
+1. **With base domain + appendBaseDomain `true` (default)**:
+   - `url: "cloud"` + `baseUrl: "home.local"` → `https://cloud.home.local`
+   - `url: ""` + `baseUrl: "home.local"` → `https://home.local`
 
-2. **With appendBaseDomain false**:
+2. **With appendBaseDomain `false`**:
    - `url: "google.com"` → `https://google.com` (https:// added automatically)
    - `url: "https://google.com"` → `https://google.com` (protocol preserved)
-   - `url: "http://192.168.1.100:8080"` → `http://192.168.1.100:8080` (protocol preserved)
+   - `url: "http://192.168.1.123:4567"` → `http://192.168.1.123:4567` (protocol preserved)
    - `url: "nextcloud.example.com"` → `https://nextcloud.example.com` (https:// added)
 
 **Example with various configurations:**
@@ -118,7 +118,7 @@ Optional configuration file to customize the dashboard behavior:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `baseUrl` | string | `"local.home.local"` | Your base domain for all services |
+| `baseUrl` | string | `"home.local"` | Your base domain for all services |
 | `showUrlsByDefault` | boolean | `true` on desktop, `false` on mobile | Whether to show URLs under service names by default |
 
 **Example configuration.json:**
@@ -169,7 +169,7 @@ The service worker provides:
 
 ### Required Icon Files
 
-For full PWA support, create a vector icon (.svg) and place it in the root folder as `icon.svg`.
+For full PWA support, create a vector icon (.svg) and place it in the root folder as `icon.svg`. You can also modify manifest.json to your own liking.
 
 ## Deployment
 
