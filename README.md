@@ -25,7 +25,31 @@ Desktop:
 
 ## Quick Start
 
-1. **Download the files**.
+1. **Download the files** or use Docker. 
+   You can use `docker pull b12e/services-dashboard:latest` and then run the container providing the path to `services.json` and `configuration.json`. Example command: 
+   ```bash
+    docker run -d \
+        --name services-dashboard \
+        -p 80:80 \
+        -v /PATH/TO/services.json:/usr/share/nginx/html/services.json:ro \
+        -v /PATH/TO/configuration.json:/usr/share/nginx/html/configuration.json:ro \
+        b12e/services-dashboard:latest
+   ```
+
+   It's also possible to use docker-compose:
+   ```yaml
+   version: '3.8'
+   services:
+    services-dashboard:
+        image: b12e/services-dashboard:latest
+        container_name: services-dashboard
+        ports:
+            - "80:80"
+        volumes:
+            - ./services.json:/usr/share/nginx/html/services.json:ro
+            - ./configuration.json:/usr/share/nginx/html/configuration.json:ro
+    restart: unless-stopped
+    ```
 
 2. **Create your `services.json`**:
 ```json
@@ -47,7 +71,7 @@ Desktop:
 }
 ```
 
-1. **Optional: Create `configuration.json`**:
+3. Create `configuration.json`**:
 ```json
 {
     "baseUrl": "home.local",
@@ -55,7 +79,7 @@ Desktop:
 }
 ```
 
-1. **Serve the files** over HTTPS (required for PWA features)
+4. **Serve the files** over HTTPS (required for PWA features)
 
 ## Configuration
 
