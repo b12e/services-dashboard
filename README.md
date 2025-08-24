@@ -51,7 +51,7 @@ Desktop:
     restart: unless-stopped
     ```
 
-2. **Create your `services.json`**:
+2. Create your `services.json`:
 ```json
 {
     "services": [
