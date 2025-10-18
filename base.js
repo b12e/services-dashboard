@@ -163,12 +163,12 @@ function displayServices(services) {
             .join('')
             .substring(0, 2)
             .toUpperCase();
-        
-        // Generate icon name for the CDN - lowercase, spaces to hyphens, remove other special characters
-        const iconName = service.name.toLowerCase()
+
+        // Use custom icon name if provided, otherwise generate from service name
+        const iconName = service.icon || service.name.toLowerCase()
             .replace(/\s+/g, '-') // Replace spaces with hyphens
             .replace(/[^a-z0-9-]/g, ''); // Keep only letters, numbers, and hyphens
-        
+
         const svgUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`;
         const pngUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`;
         
