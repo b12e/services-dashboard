@@ -66,6 +66,11 @@ Desktop:
             {
                 "name": "Homepage",
                 "url": ""
+            },
+            {
+                "name": "Airtrail",
+                "url": "flights",
+                "icon": "air-trail"
             }
         ]
     }
@@ -91,6 +96,7 @@ The `services.json` file defines all your services. Each service requires:
 | `name` | string | Display name of the service | `"Nextcloud"` |
 | `url` | string | The URL portion for the service (see URL Generation below) | `"cloud"` or `"nextcloud.example.com"` |
 | `appendBaseDomain` | boolean | Whether to append the base domain (optional, defaults to `true`) | `false` |
+| `icon` | string | custom icon from the dashboardicons.com website | `air-trail` |
 
 **URL Generation Logic:**
 
@@ -136,6 +142,11 @@ The `url` field behavior depends on your configuration:
         {
             "name": "Homepage",
             "url": ""
+        },
+        {
+            "name": "Airtrail",
+            "url": "flights",
+            "icon": "air-trail"
         }
     ]
 }
@@ -277,3 +288,6 @@ Feel free to submit issues, fork the repository, and create pull requests for an
 
 ### Version 1.0.3
 - Updated icon and readme
+
+### Version 1.0.4
+- Custom icons support
