@@ -9,8 +9,15 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 ## Screenshots
 
 Desktop:
-<img width="1633" height="974" alt="image" src="https://github.com/user-attachments/assets/f4b8ee13-49e5-4301-8c3b-db6952e4e23a" />
-<img width="2308" height="1682" alt="image" src="https://github.com/user-attachments/assets/b7f7f283-65e0-4abb-befe-f4bbf29729bf" />
+<img width="500" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/13bf87ea-c2dc-4023-ac2c-5dd975af4067" />
+
+Mobile:
+Category view:
+<img width="430" height="333" alt="image" src="https://github.com/user-attachments/assets/9a3a1986-313a-47f8-987c-f5097e7e1fb1" />
+
+Category List:
+<img width="424" height="707" alt="image" src="https://github.com/user-attachments/assets/7dc83d04-9033-444f-aad8-1d4baad3713f" />
+
 
 ## Features
 
@@ -471,5 +478,4 @@ All modern web browsers are supported:
 
 ## Getting Help
 
-- **Issues**: Report bugs at [GitHub Issues](https://github.com/yourusername/services-dashboard/issues)
-- **Documentation**: See [DEVELOPER.md](DEVELOPER.md) for development setup
+- **Issues**: Report bugs at [GitHub Issues](https://github.com/b12e/selfhosted-shortcuts/issues)

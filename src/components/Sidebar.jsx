@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
+import { formatCategoryName } from '../utils/formatCategory'
 
 function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose }) {
   const sidebarRef = useRef(null)
@@ -61,7 +62,7 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
                 className={`sidebar-item ${selectedCategory === category ? 'active' : ''}`}
                 onClick={() => handleCategoryClick(category)}
               >
-                <span className="sidebar-item-label">{category}</span>
+                <span className="sidebar-item-label">{formatCategoryName(category)}</span>
                 <span className="sidebar-item-count">{count}</span>
               </button>
             ))}

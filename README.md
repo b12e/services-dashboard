@@ -77,8 +77,6 @@ Access at `http://localhost:3000`
 
 📖 **[User Guide](USER_GUIDE.md)** - Setup, configuration, and usage instructions
 
-🛠️ **[Developer Guide](DEVELOPER.md)** - Development setup, architecture, and contributing
-
 ## Configuration
 
 ### Environment Variables
@@ -160,6 +158,4 @@ This project is open source and available for personal and commercial use.
 
 ## Support
 
-- 📚 **Documentation**: [User Guide](USER_GUIDE.md) | [Developer Guide](DEVELOPER.md)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/services-dashboard/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/services-dashboard/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/b12e/selfhosted-shortcuts/issues)

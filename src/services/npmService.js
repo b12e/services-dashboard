@@ -4,6 +4,7 @@
  */
 
 import { generateNameFromUrl } from '../utils/nameFromUrl.js'
+import { findIconForService } from './iconService.js'
 
 /**
  * Fetch all services from NPM via internal API endpoint
@@ -96,9 +97,9 @@ function constructFullUrl(service, baseUrl) {
  * @param {Array} manualServices - Manually configured services
  * @param {Array} npmServices - Auto-detected NPM services
  * @param {string} baseUrl - Base domain for manual services
- * @returns {Array} - Merged and deduplicated services array
+ * @returns {Promise<Array>} - Merged and deduplicated services array
  */
-export function mergeServices(manualServices = [], npmServices = [], baseUrl = '') {
+export async function mergeServices(manualServices = [], npmServices = [], baseUrl = '') {
   const urlMap = new Map()
   const manualUrlMap = new Map()
   let duplicatesMerged = 0
@@ -154,14 +155,21 @@ export function mergeServices(manualServices = [], npmServices = [], baseUrl = '
         ...service, // Start with NPM service (has URL, appendBaseDomain, _npmMetadata, etc.)
       }
 
+      let nameChanged = false
+
       // Only override name if manual service has one
       if (manualOverride.name) {
+        nameChanged = mergedService.name !== manualOverride.name
         mergedService.name = manualOverride.name
       }
 
       // Only override icon if manual service has one
       if (manualOverride.icon) {
         mergedService.icon = manualOverride.icon
+      } else if (nameChanged) {
+        // Name changed but no custom icon specified - re-discover icon based on new name
+        // We'll do this in a post-processing step to avoid blocking the merge
+        mergedService._needsIconRediscovery = true
       }
 
       // Only override category if manual service has one
@@ -200,16 +208,33 @@ export function mergeServices(manualServices = [], npmServices = [], baseUrl = '
     }
   })
 
-  // Final pass: Ensure all services have names (generate from URL if missing)
-  const merged = Array.from(urlMap.values()).map(service => {
-    if (!service.name) {
-      return {
-        ...service,
-        name: generateNameFromUrl(service.url)
+  // Final pass: Ensure all services have names and re-discover icons if needed
+  const merged = await Promise.all(
+    Array.from(urlMap.values()).map(async (service) => {
+      // Generate name from URL if missing
+      if (!service.name) {
+        service = {
+          ...service,
+          name: generateNameFromUrl(service.url)
+        }
       }
-    }
-    return service
-  })
+
+      // Re-discover icon if name was changed from services.json
+      if (service._needsIconRediscovery) {
+        const iconMatch = await findIconForService(service.name)
+        if (iconMatch) {
+          service.icon = iconMatch.name
+          // Also update suggested categories from the new icon match
+          if (iconMatch.categories && iconMatch.categories.length > 0) {
+            service._suggestedCategories = iconMatch.categories
+          }
+        }
+        delete service._needsIconRediscovery
+      }
+
+      return service
+    })
+  )
 
   return merged
 }

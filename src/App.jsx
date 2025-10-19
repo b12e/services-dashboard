@@ -82,7 +82,7 @@ function App() {
         }
 
         // Merge manual and NPM services (manual takes priority on URL conflicts)
-        const mergedServices = mergeServices(manualServices, npmServices, baseUrl)
+        const mergedServices = await mergeServices(manualServices, npmServices, baseUrl)
 
         if (mergedServices.length === 0) {
           throw new Error('No services found. Please configure services.json or NPM integration.')
@@ -125,15 +125,42 @@ function App() {
   // Calculate category counts (services can be in multiple categories)
   const categories = useMemo(() => {
     const counts = { all: services.length }
+
+    // First pass: Count all categories
     services.forEach(service => {
-      // Each service now has a categories array
       if (service.categories && Array.isArray(service.categories)) {
         service.categories.forEach(category => {
           counts[category] = (counts[category] || 0) + 1
         })
       }
     })
-    return counts
+
+    // Second pass: Filter out single-entry categories
+    // BUT keep them if they're the only category for at least one service
+    const filteredCounts = { all: counts.all }
+
+    Object.entries(counts).forEach(([category, count]) => {
+      if (category === 'all') return
+
+      // If category has more than 1 service, always include it
+      if (count > 1) {
+        filteredCounts[category] = count
+        return
+      }
+
+      // If category has only 1 service, check if that service has other categories
+      const serviceWithThisCategory = services.find(service =>
+        service.categories && service.categories.includes(category)
+      )
+
+      if (serviceWithThisCategory && serviceWithThisCategory.categories.length === 1) {
+        // This is the only category for this service, so keep it
+        filteredCounts[category] = count
+      }
+      // Otherwise, skip this single-entry category
+    })
+
+    return filteredCounts
   }, [services])
 
   // Filter and sort services based on search term and category
