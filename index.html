@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quick Access Dashboard</title>
-    
+
     <!-- PWA Meta Tags -->
     <meta name="description" content="Personal services quick access dashboard">
     <meta name="theme-color" content="#0f0f0f">
@@ -13,30 +13,13 @@
     <meta name="apple-mobile-web-app-title" content="Services">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Services Dashboard">
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-    
-    <!-- Icons for various platforms -->
-    <link rel="icon" type="image/png" sizes="32x32" href="icon.svg">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon.svg">
-    <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
-    
-    <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Quick Access Dashboard</h1>
-        <div class="header-controls">
-            <button id="url-toggle" class="toggle-button">
-                <span id="toggle-text">Show URLs</span>
-            </button>
-        </div>
-        <div id="services-container" class="loading">Loading services...</div>
-    </div>
 
-    <!-- JavaScript -->
-    <script src="base.js"></script>
-</body>
+    <!-- Icons for various platforms -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon.svg">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

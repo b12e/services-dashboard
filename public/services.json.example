@@ -1,0 +1,116 @@
+{
+  "services": [
+    {
+      "name": "Plex",
+      "url": "plex",
+      "icon": "plex",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Jellyfin",
+      "url": "jellyfin",
+      "icon": "jellyfin",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Sonarr",
+      "url": "sonarr",
+      "icon": "sonarr",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Radarr",
+      "url": "radarr",
+      "icon": "radarr",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Prowlarr",
+      "url": "prowlarr",
+      "icon": "prowlarr",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "qBittorrent",
+      "url": "qbittorrent",
+      "icon": "qbittorrent",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "PhotoPrism",
+      "url": "photos",
+      "icon": "photoprism",
+      "category": "Media",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Grafana",
+      "url": "grafana",
+      "icon": "grafana",
+      "category": "Monitoring",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Uptime Kuma",
+      "url": "uptime",
+      "icon": "uptime-kuma",
+      "category": "Monitoring",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Pi-hole",
+      "url": "pihole",
+      "icon": "pi-hole",
+      "category": "Network",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Nginx Proxy Manager",
+      "url": "npm",
+      "icon": "nginx-proxy-manager",
+      "category": "Network",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Nextcloud",
+      "url": "nextcloud",
+      "icon": "nextcloud",
+      "category": "Productivity",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Bitwarden",
+      "url": "bitwarden",
+      "icon": "bitwarden",
+      "category": "Productivity",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "GitHub",
+      "url": "https://github.com",
+      "icon": "github",
+      "category": "Development",
+      "appendBaseDomain": false
+    },
+    {
+      "name": "Portainer",
+      "url": "portainer",
+      "icon": "portainer",
+      "category": "Development",
+      "appendBaseDomain": true
+    },
+    {
+      "name": "Home Assistant",
+      "url": "homeassistant",
+      "icon": "home-assistant",
+      "category": "Home & Automation",
+      "appendBaseDomain": true
+    }
+  ]
+}

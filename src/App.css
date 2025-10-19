@@ -1,0 +1,593 @@
+/* Clean Modern Dashboard - Dark Theme */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    background: #0d0d0d;
+    min-height: 100vh;
+    padding: 0;
+    color: #e5e5e5;
+}
+
+/* App Layout with Sidebar */
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 240px;
+    background: #0a0a0a;
+    border-right: 1px solid #1a1a1a;
+    flex-shrink: 0;
+    overflow-y: auto;
+}
+
+.sidebar-content {
+    padding: 2rem 1rem;
+    position: sticky;
+    top: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.sidebar-logo {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.sidebar-brand {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.sidebar-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    padding: 0 0.75rem;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #9ca3af;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.sidebar-item:hover {
+    background: #1a1a1a;
+    color: #e5e5e5;
+}
+
+.sidebar-item.active {
+    background: #1a1a1a;
+    color: #3b82f6;
+    font-weight: 500;
+}
+
+.sidebar-item-label {
+    flex: 1;
+}
+
+.sidebar-item-count {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    background: #1a1a1a;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.sidebar-item.active .sidebar-item-count {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+/* Header with logo and search */
+.header {
+    margin-bottom: 3rem;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-right {
+    flex-shrink: 0;
+}
+
+/* Hamburger menu button - hidden by default on desktop */
+.menu-toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    color: #e5e5e5;
+    cursor: pointer;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.menu-toggle:hover {
+    background: #1a1a1a;
+}
+
+.menu-toggle svg {
+    width: 24px;
+    height: 24px;
+}
+
+h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+    letter-spacing: -0.03em;
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+}
+
+/* Search section - now in header */
+.search-container {
+    margin: 0;
+    padding: 0;
+}
+
+.search-wrapper {
+    position: relative;
+    max-width: 500px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: #6b7280;
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 2.75rem;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    color: #e5e5e5;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.search-input::placeholder {
+    color: #6b7280;
+}
+
+.search-input:focus {
+    border-color: #3b82f6;
+    background: #1f1f1f;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.search-clear {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2a2a2a;
+    border: none;
+    border-radius: 6px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-clear:hover {
+    background: #3a3a3a;
+    color: #e5e5e5;
+}
+
+.search-clear svg {
+    width: 14px;
+    height: 14px;
+}
+
+.search-results-count {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+/* Grid layout */
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+
+.services-grid.hide-urls .service-url {
+    display: none;
+}
+
+/* Service cards - clean and minimal */
+.service-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+    position: relative;
+    animation: fadeIn 0.3s ease forwards;
+    opacity: 0;
+}
+
+.service-card:hover {
+    border-color: #3a3a3a;
+    background: #1f1f1f;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Icon - left aligned */
+.service-icon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    background: #252525;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.service-icon img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.service-icon .fallback-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #9ca3af;
+}
+
+/* Service name - prominent */
+.service-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #e5e5e5;
+    line-height: 1.4;
+}
+
+.service-url {
+    display: none;
+}
+
+/* Error card */
+.service-card.error-card {
+    background: rgba(127, 29, 29, 0.2);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.service-card.error-card .service-icon {
+    background: rgba(220, 38, 38, 0.2);
+}
+
+.service-card.error-card .service-name {
+    color: #f87171;
+}
+
+.error-message {
+    font-size: 0.8125rem;
+    color: #f87171;
+    margin-top: 0.25rem;
+}
+
+/* Loading */
+.loading {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 1rem;
+    padding: 4rem 0;
+}
+
+/* Error state */
+.error {
+    background: rgba(127, 29, 29, 0.2);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 500px;
+    margin: 4rem auto;
+    text-align: center;
+}
+
+.error h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #f87171;
+    margin-bottom: 0.5rem;
+}
+
+.error p {
+    font-size: 0.9375rem;
+    color: #9ca3af;
+}
+
+/* No results */
+.no-results {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.no-results-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    color: #4b5563;
+}
+
+.no-results h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #e5e5e5;
+    margin-bottom: 0.5rem;
+}
+
+.no-results p {
+    font-size: 0.9375rem;
+    color: #9ca3af;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+}
+
+/* Responsive */
+@media (min-width: 640px) {
+    .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 5rem 3rem;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    .services-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+    }
+
+    .service-card {
+        padding: 1.25rem;
+    }
+}
+
+@media (min-width: 1280px) {
+    .services-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    /* Show hamburger menu */
+    .menu-toggle {
+        display: flex;
+    }
+
+    /* Hide sidebar by default on mobile */
+    .sidebar {
+        position: fixed;
+        left: -240px;
+        top: 0;
+        bottom: 0;
+        width: 240px;
+        z-index: 999;
+        transition: left 0.3s ease;
+        border-right: 1px solid #1a1a1a;
+    }
+
+    /* Show sidebar when open */
+    .sidebar.open {
+        left: 0;
+    }
+
+    /* Make overlay visible and clickable on mobile */
+    .sidebar-overlay {
+        display: block;
+        cursor: pointer;
+    }
+
+    .sidebar-content {
+        padding: 2rem 1rem;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    .sidebar-header {
+        margin-bottom: 2rem;
+    }
+
+    .sidebar-logo {
+        width: 40px;
+        height: 40px;
+    }
+
+    .sidebar-brand {
+        font-size: 1.25rem;
+    }
+
+    .sidebar-nav {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .sidebar-item {
+        white-space: normal;
+    }
+
+    .sidebar-title {
+        display: block;
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        padding: 2rem 1rem;
+    }
+
+    .header {
+        margin-bottom: 2rem;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.5rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .search-wrapper {
+        max-width: none;
+    }
+
+    .services-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .service-card {
+        padding: 1rem;
+    }
+
+    .service-icon {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+    }
+
+    .service-icon img {
+        width: 28px;
+        height: 28px;
+    }
+
+    .service-name {
+        font-size: 0.9375rem;
+    }
+}

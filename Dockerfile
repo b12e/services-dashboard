@@ -1,21 +1,53 @@
-# Use the official nginx image as base
-FROM nginx:alpine
+# Build stage
+FROM node:20-alpine as build
 
-# Install necessary tools for the startup script
-RUN apk add --no-cache bash
+WORKDIR /app
 
-# Copy the static files to nginx's default serving directory
-COPY . /usr/share/nginx/html/
+# Copy package files
+COPY package*.json ./
 
-# Copy a custom nginx configuration if needed
-# COPY nginx.conf /etc/nginx/nginx.conf
+# Install dependencies
+RUN npm ci
 
-# Create a startup script
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Copy source files
+COPY . .
 
-# Expose port 80
-EXPOSE 80
+# Build the application
+RUN npm run build
 
-# Use the startup script as entrypoint
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install curl for downloading metadata
+RUN apk add --no-cache curl
+
+# Copy package files for production dependencies
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Copy built files from build stage
+COPY --from=build /app/dist ./dist
+
+# Copy server files
+COPY server ./server
+
+# Download dashboard-icons metadata and store in container
+RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json \
+    -H "Accept: application/json" \
+    -o ./dist/dashboard-icons-metadata.json && \
+    # Verify it's valid JSON, fallback to empty array if not
+    cat ./dist/dashboard-icons-metadata.json | head -c 1 | grep -q '\[' || \
+    echo '[]' > ./dist/dashboard-icons-metadata.json
+
+# Expose port 3000
+EXPOSE 3000
+
+# Set environment variable for port
+ENV PORT=3000
+
+# Start the Node.js server
+CMD ["node", "server/index.js"]
