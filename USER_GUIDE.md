@@ -278,9 +278,20 @@ When services are discovered from Nginx Proxy Manager, the dashboard automatical
 
 ### Manual Icon Configuration
 
-For manual services in `services.json`, you can specify icons in three ways:
+For manual services in `services.json`, you can specify icons in four ways:
 
-**1. Explicit Icon Name:**
+**1. Custom Icon URL:**
+Provide a full URL to any image (supports http://, https://):
+```json
+{
+  "name": "My Custom Service",
+  "url": "service",
+  "icon": "https://example.com/path/to/icon.png"
+}
+```
+
+**2. Explicit Icon Name:**
+Use an icon from dashboard-icons by name:
 ```json
 {
   "name": "My Service",
@@ -289,16 +300,21 @@ For manual services in `services.json`, you can specify icons in three ways:
 }
 ```
 
-**2. Automatic Naming (if not specified):**
+**3. Automatic Naming (if not specified):**
 Service names are converted to icon names:
 - Spaces → hyphens: `"Home Assistant"` → `home-assistant`
 - Special characters removed: `"Sabnzbd+"` → `sabnzbd`
 - Lowercase: `"Plex"` → `plex`
 
-**3. Fallback Chain:**
+**4. Fallback Chain:**
+For dashboard-icons:
 1. Try specified icon from CDN (SVG)
 2. Try PNG version
 3. Show service initials
+
+For custom URLs:
+1. Try loading the custom URL
+2. Show service initials if it fails
 
 ## PWA Features
 

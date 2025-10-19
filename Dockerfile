@@ -39,9 +39,9 @@ COPY server ./server
 RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json \
     -H "Accept: application/json" \
     -o ./dist/dashboard-icons-metadata.json && \
-    # Verify it's valid JSON, fallback to empty array if not
-    cat ./dist/dashboard-icons-metadata.json | head -c 1 | grep -q '\[' || \
-    echo '[]' > ./dist/dashboard-icons-metadata.json
+    # Verify it's valid JSON (should start with { or [), fallback to empty object if not
+    (cat ./dist/dashboard-icons-metadata.json | head -c 1 | grep -qE '[\[{]' || \
+    echo '{}' > ./dist/dashboard-icons-metadata.json)
 
 # Expose port 3000
 EXPOSE 3000

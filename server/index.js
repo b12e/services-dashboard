@@ -103,10 +103,16 @@ async function loadIconsMetadata() {
       iconsMetadata = Array.isArray(data) ? data : []
     }
 
-    console.log(`Loaded metadata for ${iconsMetadata.length} icons`)
+    if (iconsMetadata.length === 0) {
+      console.warn('WARNING: Icons metadata is empty! No icons will be auto-detected.')
+      console.warn('Check that /app/dist/dashboard-icons-metadata.json exists and is valid.')
+    } else {
+      console.log(`✓ Loaded metadata for ${iconsMetadata.length} icons`)
+    }
     return iconsMetadata
   } catch (error) {
-    console.error('Error loading icons metadata:', error.message)
+    console.error('ERROR loading icons metadata:', error.message)
+    console.error('Path attempted:', join(distPath, 'dashboard-icons-metadata.json'))
     iconsMetadata = []
     return []
   }
@@ -178,20 +184,26 @@ async function findIconForService(serviceName) {
   }
 
   if (bestScore >= 0.6 && bestMatch) {
-    // Prefer light variant for dark mode compatibility
+    console.log(`  bestMatch object:`, JSON.stringify(bestMatch, null, 2))
+
+    // IMPORTANT: Always use the actual icon name from the metadata, not the alias!
     let iconName = bestMatch.name
+    console.log(`  Original icon name: "${iconName}"`)
+
+    // Prefer light variant for dark mode compatibility
     if (bestMatch.colors && bestMatch.colors.light) {
       iconName = bestMatch.colors.light
+      console.log(`  Using light variant: "${iconName}"`)
     }
 
-    // Get category from metadata (categories is an array, take first one)
-    let category = null
-    if (bestMatch.categories && Array.isArray(bestMatch.categories) && bestMatch.categories.length > 0) {
-      category = bestMatch.categories[0]
+    // Get all categories from metadata
+    let categories = []
+    if (bestMatch.categories && Array.isArray(bestMatch.categories)) {
+      categories = bestMatch.categories
     }
 
-    console.log(`  ✓ Found: "${iconName}" (score: ${bestScore})`)
-    return { name: iconName, category }
+    console.log(`  ✓ Returning icon: "${iconName}" (score: ${bestScore})`)
+    return { name: iconName, categories }
   }
 
   console.log(`  ✗ No match found (best score: ${bestScore})`)
@@ -223,7 +235,7 @@ async function convertProxyHostToService(proxyHost) {
     url: url,
     appendBaseDomain: false,
     icon: iconMatch?.name || null,
-    _suggestedCategory: iconMatch?.category || null,
+    _suggestedCategories: iconMatch?.categories || [],
     _npmMetadata: {
       id: proxyHost.id,
       enabled: proxyHost.enabled,

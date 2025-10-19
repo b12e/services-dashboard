@@ -43,12 +43,20 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
     .substring(0, 2)
     .toUpperCase()
 
+  // Check if icon is a custom URL (starts with http:// or https://)
+  const isCustomIconUrl = service.icon && (service.icon.startsWith('http://') || service.icon.startsWith('https://'))
+
   const iconName = service.icon || service.name.toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
 
-  const svgUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`
-  const pngUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+  // If custom URL, use it directly; otherwise use dashboard-icons CDN
+  const svgUrl = isCustomIconUrl
+    ? service.icon
+    : `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`
+  const pngUrl = isCustomIconUrl
+    ? service.icon
+    : `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
 
   const [imageError, setImageError] = useState(false)
   const [usePng, setUsePng] = useState(false)
@@ -85,7 +93,10 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
   }
 
   const handleImageError = () => {
-    if (!usePng) {
+    // If custom URL, skip PNG fallback and go straight to initials
+    if (isCustomIconUrl) {
+      setImageError(true)
+    } else if (!usePng) {
       setUsePng(true)
     } else {
       setImageError(true)

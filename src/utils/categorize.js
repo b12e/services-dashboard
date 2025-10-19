@@ -71,37 +71,63 @@ const categoryKeywords = {
 
 /**
  * Automatically categorizes a service based on its name
+ * Returns ALL matching categories (can be multiple)
  * @param {string} serviceName - The name of the service
- * @returns {string} - The determined category or 'Other'
+ * @returns {Array<string>} - Array of category names
  */
 export function autoCategorizeName(serviceName) {
-  if (!serviceName) return 'Other'
+  if (!serviceName) return []
 
   const lowerName = serviceName.toLowerCase()
+  const matchedCategories = []
 
   // Check each category's keywords
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
     for (const keyword of keywords) {
       if (lowerName.includes(keyword)) {
-        return category
+        matchedCategories.push(category)
+        break // Don't add the same category twice
       }
     }
   }
 
-  return 'Other'
+  return matchedCategories
 }
 
 /**
- * Categorizes a service, using the provided category or auto-detecting
+ * Categorizes a service, using the provided categories or auto-detecting
  * @param {Object} service - The service object
- * @returns {string} - The category name
+ * @returns {Array<string>} - Array of category names
  */
 export function categorizeService(service) {
-  // If category is already set and not empty, use it
-  if (service.category && service.category.trim() !== '') {
-    return service.category
+  const categories = []
+
+  // 1. Check for manual category (single string - legacy)
+  if (service.category && typeof service.category === 'string' && service.category.trim() !== '') {
+    categories.push(service.category)
   }
 
-  // Otherwise, auto-categorize based on name
-  return autoCategorizeName(service.name)
+  // 2. Check for manual categories array
+  if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
+    categories.push(...service.categories)
+  }
+
+  // 3. Check for suggested categories from icon metadata
+  if (service._suggestedCategories && Array.isArray(service._suggestedCategories)) {
+    categories.push(...service._suggestedCategories)
+  }
+
+  // 4. Auto-categorize based on name if no categories found
+  if (categories.length === 0) {
+    const autoCategories = autoCategorizeName(service.name)
+    categories.push(...autoCategories)
+  }
+
+  // 5. If still no categories, use 'Other'
+  if (categories.length === 0) {
+    categories.push('Other')
+  }
+
+  // Remove duplicates
+  return [...new Set(categories)]
 }

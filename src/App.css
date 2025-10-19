@@ -9,20 +9,24 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     background: #0d0d0d;
-    min-height: 100vh;
+    height: 100vh;
     padding: 0;
     color: #e5e5e5;
+    overflow: hidden;
 }
 
 /* App Layout with Sidebar */
 .app-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .main-content {
     flex: 1;
     min-width: 0;
+    overflow-y: auto;
+    height: 100vh;
 }
 
 .container {

@@ -21,8 +21,8 @@ function App() {
 
   // Preload icons metadata on app start
   useEffect(() => {
-    preloadIconsMetadata().catch(err => {
-      console.error('Failed to preload icons metadata:', err)
+    preloadIconsMetadata().catch(() => {
+      // Silently fail - icons will fall back to initials
     })
   }, [])
 
@@ -36,21 +36,15 @@ function App() {
 
           if (config.baseUrl) {
             setBaseUrl(config.baseUrl)
-            console.log('Base URL set from config:', config.baseUrl)
           }
 
           // Check if NPM is enabled (server-side)
           if (config.npmEnabled) {
             setNpmEnabled(true)
-            console.log('NPM integration enabled')
-          } else {
-            console.log('NPM integration not configured or disabled')
           }
-        } else {
-          console.log('Failed to load configuration from API')
         }
       } catch (error) {
-        console.log('Error loading configuration:', error)
+        // Silently fail - will use defaults
       } finally {
         setConfigLoaded(true)
       }
@@ -76,38 +70,28 @@ function App() {
             const data = await response.json()
             if (data.services && Array.isArray(data.services)) {
               manualServices = data.services
-              console.log(`Loaded ${manualServices.length} manual services from services.json`)
-            } else {
-              console.warn('services.json has invalid structure, expected { services: [...] }')
             }
-          } else {
-            console.log('No services.json found (this is OK if using NPM auto-detection)')
           }
         } catch (err) {
-          console.log('services.json not available or invalid:', err.message)
+          // Silently fail - services.json is optional
         }
 
         // Fetch NPM services only if NPM is enabled on the server
         if (npmEnabled) {
-          console.log('Fetching services from NPM...')
           npmServices = await fetchNPMServices()
-          console.log(`Loaded ${npmServices.length} services from NPM`)
-        } else {
-          console.log('NPM auto-detection disabled')
         }
 
         // Merge manual and NPM services (manual takes priority on URL conflicts)
         const mergedServices = mergeServices(manualServices, npmServices, baseUrl)
-        console.log(`Total services after merge: ${mergedServices.length}`)
 
         if (mergedServices.length === 0) {
           throw new Error('No services found. Please configure services.json or NPM integration.')
         }
 
-        // Auto-categorize all services
+        // Auto-categorize all services (now returns array of categories)
         const categorizedServices = mergedServices.map(service => ({
           ...service,
-          category: categorizeService(service)
+          categories: categorizeService(service)
         }))
 
         setServices(categorizedServices)
@@ -138,13 +122,16 @@ function App() {
     setIsMobileMenuOpen(false)
   }, [])
 
-  // Calculate category counts
+  // Calculate category counts (services can be in multiple categories)
   const categories = useMemo(() => {
     const counts = { all: services.length }
     services.forEach(service => {
-      // categorizeService is already applied during loading, so service.category will always exist
-      const category = service.category
-      counts[category] = (counts[category] || 0) + 1
+      // Each service now has a categories array
+      if (service.categories && Array.isArray(service.categories)) {
+        service.categories.forEach(category => {
+          counts[category] = (counts[category] || 0) + 1
+        })
+      }
     })
     return counts
   }, [services])
@@ -153,9 +140,13 @@ function App() {
   const filteredServices = useMemo(() => {
     let result = [...services]
 
-    // Filter by category
+    // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
-      result = result.filter(service => service.category === selectedCategory)
+      result = result.filter(service =>
+        service.categories &&
+        Array.isArray(service.categories) &&
+        service.categories.includes(selectedCategory)
+      )
     }
 
     // Sort alphabetically by name

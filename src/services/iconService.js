@@ -17,7 +17,6 @@ async function loadIconsMetadata() {
   try {
     const response = await fetch('/dashboard-icons-metadata.json')
     if (!response.ok) {
-      console.warn(`Failed to load icons metadata: ${response.status}`)
       iconsMetadata = []
       return []
     }
@@ -26,7 +25,6 @@ async function loadIconsMetadata() {
 
     // Check if response is valid JSON
     if (!text || !text.trim().startsWith('[') && !text.trim().startsWith('{')) {
-      console.warn('Icons metadata is not valid JSON, using fallback')
       iconsMetadata = []
       return []
     }
@@ -43,10 +41,8 @@ async function loadIconsMetadata() {
       iconsMetadata = Array.isArray(data) ? data : []
     }
 
-    console.log(`Loaded metadata for ${iconsMetadata.length} icons`)
     return iconsMetadata
   } catch (error) {
-    console.error('Error loading icons metadata:', error.message)
     iconsMetadata = []
     return []
   }
@@ -138,16 +134,15 @@ export async function findIconForService(serviceName) {
       iconName = bestMatch.colors.light
     }
 
-    // Get category from metadata (categories is an array, take first one)
-    let category = null
-    if (bestMatch.categories && Array.isArray(bestMatch.categories) && bestMatch.categories.length > 0) {
-      category = bestMatch.categories[0]
+    // Get all categories from metadata
+    let categories = []
+    if (bestMatch.categories && Array.isArray(bestMatch.categories)) {
+      categories = bestMatch.categories
     }
 
-    console.log(`Found icon for "${serviceName}": "${iconName}" (score: ${bestScore})${category ? ` [${category}]` : ''}`)
     return {
       name: iconName,
-      category
+      categories
     }
   }
 
