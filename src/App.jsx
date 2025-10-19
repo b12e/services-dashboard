@@ -199,14 +199,16 @@ function App() {
     // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'Other') {
-        // For "Other", show services that have at least one category not in the top displayed categories
+        // For "Other", only show services that have NO categories in the displayed categories
+        // (i.e., all their categories are hidden)
         const displayedCategories = Object.keys(categories).filter(cat => cat !== 'all' && cat !== 'Other')
         result = result.filter(service => {
           if (!service.categories || !Array.isArray(service.categories)) return false
 
-          // Include if service has "Other" as explicit category OR has categories not in displayed list
+          // Only include if service has "Other" as explicit category
+          // OR if NONE of its categories are in the displayed list
           return service.categories.includes('Other') ||
-                 service.categories.some(cat => !displayedCategories.includes(cat))
+                 !service.categories.some(cat => displayedCategories.includes(cat))
         })
       } else {
         result = result.filter(service =>
