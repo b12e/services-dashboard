@@ -14,7 +14,6 @@ Desktop:
 
 Mobile:
 
-Category view:
 <img height="500" alt="image" src="https://github.com/user-attachments/assets/b2f9109d-dbb7-419f-b3bb-6f5aadf1f120" /> <img height="500" alt="Categories" src="https://github.com/user-attachments/assets/5164f38d-9073-4290-935a-6c71aee416b5" />
 
 
