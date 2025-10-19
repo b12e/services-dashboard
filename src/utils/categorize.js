@@ -4,12 +4,7 @@
  */
 
 const categoryKeywords = {
-  'Media-Servers': [
-    'plex', 'jellyfin', 'emby', 'kodi', 'media server', 'mediaserver',
-    'navidrome', 'airsonic', 'subsonic', 'funkwhale', 'ampache',
-    'streama', 'dim', 'gerbera', 'minidlna'
-  ],
-  'Media-Management': [
+  'Media': [
     // *arr stack
     'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr', 'prowlarr',
     'whisparr', 'jonarr',
@@ -18,7 +13,11 @@ const categoryKeywords = {
     // Statistics & tracking
     'tautulli', 'varken', 'organizr',
     // Other media tools
-    'mylar', 'lazylibrarian', 'sickchill', 'couchpotato', 'medusa'
+    'mylar', 'lazylibrarian', 'sickchill', 'couchpotato', 'medusa',
+    // Media servers
+    'plex', 'jellyfin', 'emby', 'kodi', 'media server', 'mediaserver',
+    'navidrome', 'airsonic', 'subsonic', 'funkwhale', 'ampache',
+    'streama', 'dim', 'gerbera', 'minidlna'
   ],
   'Download-Managers': [
     // BitTorrent
@@ -27,7 +26,10 @@ const categoryKeywords = {
     // Usenet
     'sabnzbd', 'nzbget', 'nzbhydra', 'nzbhydra2',
     // General
-    'jdownloader', 'pyload', 'aria2', 'youtube-dl', 'yt-dlp', 'tubesync'
+    'jdownloader', 'pyload', 'aria2', 'youtube-dl', 'yt-dlp', 'tubesync',
+    // Arr stack because they also manage downloads
+    'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr', 'prowlarr',
+    'whisparr', 'jonarr',
   ],
   'Photos': [
     'photoprism', 'immich', 'piwigo', 'lychee', 'photoview', 'photostructure',
@@ -86,13 +88,12 @@ const categoryKeywords = {
     'pritunl', 'softether',
     // Network tools
     'speedtest', 'librespeed', 'smokeping', 'netbox', 'phpipam',
-    'gateway', 'router'
-  ],
-  'DNS-Adblock': [
-    'pihole', 'pi-hole', 'adguard', 'adguard home', 'blocky', 'technitium',
+    'gateway', 'router',
+    // DNS & Adblock
+     'pihole', 'pi-hole', 'adguard', 'adguard home', 'blocky', 'technitium',
     'dns', 'adblock', 'ad-block'
   ],
-  'Security-Auth': [
+  'Security': [
     'authentik', 'authelia', 'keycloak', 'lldap', 'openldap', 'glauth',
     'oauth', 'sso', 'ldap', 'saml', 'oidc',
     'vault', 'hashicorp', 'auth', 'authentication',
@@ -146,13 +147,10 @@ const categoryKeywords = {
     'valheim', 'terraria', 'factorio', 'satisfactory', 'palworld',
     'craftybytes', 'crafty', 'cubecoders', 'linuxgsm', 'gameservers'
   ],
-  'Backup-Sync': [
-    'duplicati', 'duplicacy', 'restic', 'borg', 'borgmatic', 'kopia',
-    'syncthing', 'rsync', 'rclone', 'backup', 'sync'
-  ],
-  'Storage': [
+  'Backup-and-storage': [
     'minio', 's3', 'garage', 'seaweedfs', 'ceph', 'gluster',
-    'nfs', 'samba', 'webdav', 'storage', 'files'
+    'nfs', 'samba', 'webdav', 'storage', 'files', 'duplicati', 'duplicacy', 'restic', 'borg', 'borgmatic', 'kopia',
+    'syncthing', 'rsync', 'rclone', 'backup', 'sync'
   ],
   'System-Management': [
     'cockpit', 'webmin', 'ajenti', 'yunohost', 'cloudron', 'caprover',

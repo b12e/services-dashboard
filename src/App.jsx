@@ -161,16 +161,17 @@ function App() {
     })
 
     // Third pass: Limit to 10 categories max (excluding "all")
-    // Move smallest categories to "Other"
-    const MAX_CATEGORIES = 10
+    // Show 9 regular categories + "Other" = 10 total displayed categories
+    const MAX_DISPLAYED_CATEGORIES = 10
+    const MAX_REGULAR_CATEGORIES = MAX_DISPLAYED_CATEGORIES - 1 // Reserve 1 slot for "Other"
     const categoriesWithoutAll = Object.entries(filteredCounts)
       .filter(([key]) => key !== 'all' && key !== 'Other')
       .sort(([, countA], [, countB]) => countB - countA) // Sort by count descending
 
-    if (categoriesWithoutAll.length > MAX_CATEGORIES) {
-      // Keep top 10 categories, move rest to "Other"
-      const topCategories = categoriesWithoutAll.slice(0, MAX_CATEGORIES)
-      const otherCategories = categoriesWithoutAll.slice(MAX_CATEGORIES)
+    if (categoriesWithoutAll.length > MAX_REGULAR_CATEGORIES) {
+      // Keep top 9 categories, move rest to "Other"
+      const topCategories = categoriesWithoutAll.slice(0, MAX_REGULAR_CATEGORIES)
+      const otherCategories = categoriesWithoutAll.slice(MAX_REGULAR_CATEGORIES)
 
       const finalCounts = { all: filteredCounts.all }
 
