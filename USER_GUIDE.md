@@ -9,19 +9,19 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 ## Screenshots
 
 Desktop:
-<img width="500" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/13bf87ea-c2dc-4023-ac2c-5dd975af4067" />
+<img width="500" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/1755f267-7f5f-41d0-9a63-c76224beadeb" />
 
 Mobile:
 Category view:
-<img width="430" height="333" alt="image" src="https://github.com/user-attachments/assets/9a3a1986-313a-47f8-987c-f5097e7e1fb1" />
+<img height="500" alt="image" src="https://github.com/user-attachments/assets/b2f9109d-dbb7-419f-b3bb-6f5aadf1f120" />
 
 Category List:
-<img width="424" height="707" alt="image" src="https://github.com/user-attachments/assets/7dc83d04-9033-444f-aad8-1d4baad3713f" />
+<img width="423" height="829" alt="Categories" src="https://github.com/user-attachments/assets/5164f38d-9073-4290-935a-6c71aee416b5" />
 
 
 ## Features
 
-- 🌙 **Dark Mode**: Sleek dark theme with clean, modern design
+- 🌙 **Dark Theme**: Sleek dark theme with clean, modern design
 - 📱 **PWA Support**: Install as an app on mobile or desktop
 - 🔌 **Offline Ready**: Works offline with cached icons and data
 - 🎨 **Automatic Icons**: Fetches service icons from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
@@ -124,7 +124,7 @@ Both can be used together for maximum flexibility.
 
 The `services.json` file is **optional** if you're using NPM auto-detection. If provided, it defines manual services that will be merged with auto-detected ones.
 
-Each service requires:
+Each service supports:
 
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
@@ -133,6 +133,7 @@ Each service requires:
 | `appendBaseDomain` | boolean | Whether to append the base domain (optional, defaults to `true`) | `false` |
 | `icon` | string | Custom icon from dashboardicons.com (optional) | `"air-trail"` |
 | `category` | string | Category for the service (optional, auto-detected if not provided) | `"Media"` |
+| `hidden` | boolean | Whether or not to hide the service (optional, useful if using NPM loading) | `true` |
 
 #### URL Generation Logic
 
@@ -237,16 +238,6 @@ environment:
 ## Categories
 
 Services are automatically organized into categories for easy navigation via the sidebar (hamburger menu on mobile).
-
-### Supported Categories
-
-- **Media** - Plex, Jellyfin, Sonarr, Radarr, qBittorrent, PhotoPrism, Calibre
-- **Productivity** - Nextcloud, Bitwarden, Bookstack, Wiki, Paperless, Firefly III
-- **Monitoring** - Grafana, Uptime Kuma, Prometheus, Netdata, Plausible
-- **Network** - Pi-hole, Nginx Proxy Manager, Traefik, Authentik, VPN
-- **Development** - GitHub, GitLab, Portainer, Jenkins, Docker
-- **Home & Automation** - Home Assistant, Node-RED, Discord, Mattermost, Minecraft
-- **Other** - Services that don't match any category
 
 ### Automatic Categorization
 
