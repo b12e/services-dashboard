@@ -57,15 +57,50 @@ function normalizeUrl(url) {
 }
 
 /**
+ * Construct full URL for a manual service (handles appendBaseDomain)
+ * @param {Object} service - Service object
+ * @param {string} baseUrl - Base domain
+ * @returns {string} - Full URL
+ */
+function constructFullUrl(service, baseUrl) {
+  const url = service.url || ''
+  const appendBaseDomain = service.appendBaseDomain !== false // default true
+
+  // If URL already has protocol, use as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+
+  // If appendBaseDomain is false, add https:// prefix
+  if (!appendBaseDomain) {
+    return `https://${url}`
+  }
+
+  // If appendBaseDomain is true and we have a baseUrl
+  if (baseUrl) {
+    // If url is empty, just use baseUrl
+    if (!url) {
+      return `https://${baseUrl}`
+    }
+    // Otherwise append to baseUrl
+    return `https://${url}.${baseUrl}`
+  }
+
+  // Fallback: add https:// prefix
+  return url ? `https://${url}` : ''
+}
+
+/**
  * Merge NPM services with manually configured services
  * Deduplicates by URL. If same URL exists in both:
  * - Use name/icon/category from manual services.json
  * - Keep URL and metadata from NPM
  * @param {Array} manualServices - Manually configured services
  * @param {Array} npmServices - Auto-detected NPM services
+ * @param {string} baseUrl - Base domain for manual services
  * @returns {Array} - Merged and deduplicated services array
  */
-export function mergeServices(manualServices = [], npmServices = []) {
+export function mergeServices(manualServices = [], npmServices = [], baseUrl = '') {
   const urlMap = new Map()
   const manualUrlMap = new Map()
   let duplicatesMerged = 0
@@ -73,17 +108,24 @@ export function mergeServices(manualServices = [], npmServices = []) {
   let npmOnlyCount = 0
 
   // First pass: Index all manual services by normalized URL
+  console.log('=== Processing Manual Services ===')
+  console.log(`Base URL: "${baseUrl}"`)
   manualServices.forEach(service => {
     if (!service || !service.url) {
       console.warn('Skipping manual service with no URL:', service?.name || 'unnamed')
       return
     }
 
-    const normalizedUrl = normalizeUrl(service.url)
+    // Construct full URL for manual service
+    const fullUrl = constructFullUrl(service, baseUrl)
+    const normalizedUrl = normalizeUrl(fullUrl)
+
     if (!normalizedUrl) {
       console.warn('Invalid URL for manual service:', service?.name || 'unnamed')
       return
     }
+
+    console.log(`Manual: "${service.name}" -> ${service.url} -> ${fullUrl} -> [${normalizedUrl}]`)
 
     // Store manual service in a separate map for override lookup
     manualUrlMap.set(normalizedUrl, {
@@ -93,8 +135,10 @@ export function mergeServices(manualServices = [], npmServices = []) {
       fullService: service
     })
   })
+  console.log(`Indexed ${manualUrlMap.size} manual services`)
 
   // Second pass: Process NPM services
+  console.log('=== Processing NPM Services ===')
   npmServices.forEach(service => {
     if (!service || !service.url) {
       console.warn('Skipping NPM service with no URL:', service?.name || 'unnamed')
@@ -106,6 +150,8 @@ export function mergeServices(manualServices = [], npmServices = []) {
       console.warn('Invalid URL for NPM service:', service?.name || 'unnamed')
       return
     }
+
+    console.log(`NPM: "${service.name}" -> ${service.url} -> [${normalizedUrl}]`)
 
     // Check if this URL exists in manual services
     if (manualUrlMap.has(normalizedUrl)) {
@@ -129,18 +175,21 @@ export function mergeServices(manualServices = [], npmServices = []) {
 
       urlMap.set(normalizedUrl, mergedService)
       duplicatesMerged++
-      console.log(`Merged: "${manualOverride.name}" (${normalizedUrl}) - using manual name/icon with NPM URL`)
+      console.log(`  ✓ MERGED with manual service "${manualOverride.name}"`)
     } else {
       // No manual override, add NPM service as-is
       urlMap.set(normalizedUrl, service)
       npmOnlyCount++
+      console.log(`  → Added as NPM-only service`)
     }
   })
 
   // Third pass: Add manual services that DON'T have NPM equivalents
+  console.log('=== Adding Manual-Only Services ===')
   manualUrlMap.forEach((manualOverride, normalizedUrl) => {
     if (!urlMap.has(normalizedUrl)) {
       // This manual service doesn't have an NPM equivalent, add it
+      console.log(`Manual-only: "${manualOverride.name}" [${normalizedUrl}]`)
       urlMap.set(normalizedUrl, manualOverride.fullService)
       manualOnlyCount++
     }
@@ -149,11 +198,12 @@ export function mergeServices(manualServices = [], npmServices = []) {
   const merged = Array.from(urlMap.values())
 
   // Detailed logging
-  console.log(`Service merge complete:`)
+  console.log('=== Service Merge Summary ===')
   console.log(`  - Manual only: ${manualOnlyCount}`)
   console.log(`  - NPM only: ${npmOnlyCount}`)
   console.log(`  - Merged (manual override): ${duplicatesMerged}`)
   console.log(`  - Total unique services: ${merged.length}`)
+  console.log(`  - Expected: ${manualServices.length} manual + ${npmServices.length} NPM = ${manualServices.length + npmServices.length}`)
 
   return merged
 }

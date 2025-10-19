@@ -97,7 +97,7 @@ function App() {
         }
 
         // Merge manual and NPM services (manual takes priority on URL conflicts)
-        const mergedServices = mergeServices(manualServices, npmServices)
+        const mergedServices = mergeServices(manualServices, npmServices, baseUrl)
         console.log(`Total services after merge: ${mergedServices.length}`)
 
         if (mergedServices.length === 0) {

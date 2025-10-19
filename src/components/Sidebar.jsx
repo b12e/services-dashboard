@@ -66,6 +66,9 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
               </button>
             ))}
         </nav>
+        <div className="sidebar-footer">
+          <p>&copy; {new Date().getFullYear()} b12e</p>
+        </div>
       </div>
     </aside>
     </>

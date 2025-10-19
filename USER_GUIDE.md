@@ -383,26 +383,44 @@ docker exec services-dashboard ls -la /usr/share/nginx/html/services.json
 The dashboard intelligently merges services when the same URL exists in both `services.json` and NPM:
 
 **Merge Behavior:**
+- **Deduplication is protocol-agnostic**: `http://plex.example.com` and `https://plex.example.com` are considered the same
 - If a URL exists in both sources, the service is **merged** (not skipped)
 - **Name** from services.json takes priority
 - **Icon** from services.json takes priority (if specified)
 - **Category** from services.json takes priority (if specified)
-- **URL and metadata** from NPM are kept
+- **URL and metadata** from NPM are kept (including correct http/https protocol)
 
-**Example:**
+**Example 1 - Protocol-Agnostic Matching:**
 ```json
 // In services.json:
 {
   "name": "My Plex Server",
-  "url": "plex.example.com",
+  "url": "http://plex.example.com",  // You specify http://
   "icon": "plex",
   "category": "Media"
 }
 
-// NPM has: https://plex.example.com (auto-detected)
+// NPM has: https://plex.example.com (auto-detected with SSL)
 
-// Result: Uses "My Plex Server" name and "plex" icon,
-// but keeps NPM's URL and SSL detection
+// Result: Recognized as SAME service (deduplication works)
+// Uses "My Plex Server" name and "plex" icon,
+// but keeps NPM's https:// URL (SSL detected by NPM)
+```
+
+**Example 2 - Domain-Only Matching:**
+```json
+// In services.json:
+{
+  "name": "Production Grafana",
+  "url": "grafana.example.com",  // No protocol specified
+  "icon": "grafana"
+}
+
+// NPM has: https://grafana.example.com
+
+// Result: Recognized as SAME service
+// Uses "Production Grafana" name and "grafana" icon,
+// keeps NPM's https:// URL
 ```
 
 **Why this is useful:**

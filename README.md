@@ -11,12 +11,11 @@ A beautiful, dark-themed React dashboard for all your self-hosted services with 
 
 ## Screenshots
 
-<img width="1633" height="974" alt="Desktop view" src="https://github.com/user-attachments/assets/f4b8ee13-49e5-4301-8c3b-db6952e4e23a" />
-<img width="2308" height="1682" alt="Mobile view" src="https://github.com/user-attachments/assets/b7f7f283-65e0-4abb-befe-f4bbf29729bf" />
+TODO
 
 ## Features
 
-- 🌙 **Dark Mode**: Sleek dark theme with clean, modern design
+- 🌙 **Dark Theme**: Sleek dark theme with clean, modern design
 - 📱 **PWA Support**: Install as an app on mobile or desktop
 - 🔌 **Offline Ready**: Works offline with cached icons and data
 - 🎨 **Automatic Icons**: Fetches service icons with intelligent fuzzy matching
