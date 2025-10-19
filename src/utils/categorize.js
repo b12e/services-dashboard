@@ -17,7 +17,10 @@ const categoryKeywords = {
     // Media servers
     'plex', 'jellyfin', 'emby', 'kodi', 'media server', 'mediaserver',
     'navidrome', 'airsonic', 'subsonic', 'funkwhale', 'ampache',
-    'streama', 'dim', 'gerbera', 'minidlna'
+    'streama', 'dim', 'gerbera', 'minidlna',
+    // Written media
+      'calibre', 'calibre-web', 'kavita', 'komga', 'ubooquity', 'audiobookshelf',
+    'readarr', 'bookstack', 'lazylibrarian', 'mylar', 'mango', 'tanoshi'
   ],
   'Download-Managers': [
     // BitTorrent
@@ -35,10 +38,6 @@ const categoryKeywords = {
     'photoprism', 'immich', 'piwigo', 'lychee', 'photoview', 'photostructure',
     'pigallery', 'chevereto', 'librephotos', 'ownphotos', 'photos',
     'pixelfed', 'memories', 'photoview'
-  ],
-  'Books-Reading': [
-    'calibre', 'calibre-web', 'kavita', 'komga', 'ubooquity', 'audiobookshelf',
-    'readarr', 'bookstack', 'lazylibrarian', 'mylar', 'mango', 'tanoshi'
   ],
   'Productivity': [
     // Cloud storage
