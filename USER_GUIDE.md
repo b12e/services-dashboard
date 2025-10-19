@@ -9,14 +9,13 @@ A beautiful, dark-themed dashboard for all your self-hosted services with PWA su
 ## Screenshots
 
 Desktop:
+
 <img width="500" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/1755f267-7f5f-41d0-9a63-c76224beadeb" />
 
 Mobile:
-Category view:
-<img height="500" alt="image" src="https://github.com/user-attachments/assets/b2f9109d-dbb7-419f-b3bb-6f5aadf1f120" />
 
-Category List:
-<img width="423" height="829" alt="Categories" src="https://github.com/user-attachments/assets/5164f38d-9073-4290-935a-6c71aee416b5" />
+Category view:
+<img height="500" alt="image" src="https://github.com/user-attachments/assets/b2f9109d-dbb7-419f-b3bb-6f5aadf1f120" /> <img width="423" height="829" alt="Categories" src="https://github.com/user-attachments/assets/5164f38d-9073-4290-935a-6c71aee416b5" />
 
 
 ## Features
