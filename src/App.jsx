@@ -160,6 +160,34 @@ function App() {
       // Otherwise, skip this single-entry category
     })
 
+    // Third pass: Limit to 10 categories max (excluding "all")
+    // Move smallest categories to "Other"
+    const MAX_CATEGORIES = 10
+    const categoriesWithoutAll = Object.entries(filteredCounts)
+      .filter(([key]) => key !== 'all' && key !== 'Other')
+      .sort(([, countA], [, countB]) => countB - countA) // Sort by count descending
+
+    if (categoriesWithoutAll.length > MAX_CATEGORIES) {
+      // Keep top 10 categories, move rest to "Other"
+      const topCategories = categoriesWithoutAll.slice(0, MAX_CATEGORIES)
+      const otherCategories = categoriesWithoutAll.slice(MAX_CATEGORIES)
+
+      const finalCounts = { all: filteredCounts.all }
+
+      // Add top categories
+      topCategories.forEach(([category, count]) => {
+        finalCounts[category] = count
+      })
+
+      // Combine remaining categories into "Other"
+      const otherCount = otherCategories.reduce((sum, [, count]) => sum + count, 0)
+      if (otherCount > 0 || filteredCounts.Other) {
+        finalCounts.Other = (filteredCounts.Other || 0) + otherCount
+      }
+
+      return finalCounts
+    }
+
     return filteredCounts
   }, [services])
 
@@ -169,11 +197,23 @@ function App() {
 
     // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
-      result = result.filter(service =>
-        service.categories &&
-        Array.isArray(service.categories) &&
-        service.categories.includes(selectedCategory)
-      )
+      if (selectedCategory === 'Other') {
+        // For "Other", show services that have at least one category not in the top displayed categories
+        const displayedCategories = Object.keys(categories).filter(cat => cat !== 'all' && cat !== 'Other')
+        result = result.filter(service => {
+          if (!service.categories || !Array.isArray(service.categories)) return false
+
+          // Include if service has "Other" as explicit category OR has categories not in displayed list
+          return service.categories.includes('Other') ||
+                 service.categories.some(cat => !displayedCategories.includes(cat))
+        })
+      } else {
+        result = result.filter(service =>
+          service.categories &&
+          Array.isArray(service.categories) &&
+          service.categories.includes(selectedCategory)
+        )
+      }
     }
 
     // Sort alphabetically by name

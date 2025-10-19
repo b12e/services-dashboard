@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types'
+import { formatCategoryName } from '../utils/formatCategory'
 
 function Header({ searchBar, selectedCategory, onMenuToggle }) {
-  const categoryDisplay = selectedCategory === 'all' ? 'All Services' : selectedCategory
+  const categoryDisplay = selectedCategory === 'all' ? 'All Services' : formatCategoryName(selectedCategory)
 
   return (
     <div className="header">
