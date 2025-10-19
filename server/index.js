@@ -145,13 +145,21 @@ async function findIconForService(serviceName) {
   let bestMatch = null
   let bestScore = 0
 
+  const normalizedServiceName = normalizeString(serviceName)
+  console.log(`Icon search for "${serviceName}" (normalized: "${normalizedServiceName}")`)
+
   for (const icon of metadata) {
     const iconNameScore = calculateSimilarity(serviceName, icon.name)
     let aliasScore = 0
+    let matchedAlias = null
 
     if (icon.aliases && Array.isArray(icon.aliases)) {
       for (const alias of icon.aliases) {
-        aliasScore = Math.max(aliasScore, calculateSimilarity(serviceName, alias))
+        const score = calculateSimilarity(serviceName, alias)
+        if (score > aliasScore) {
+          aliasScore = score
+          matchedAlias = alias
+        }
       }
     }
 
@@ -159,6 +167,11 @@ async function findIconForService(serviceName) {
     if (score > bestScore) {
       bestScore = score
       bestMatch = icon
+
+      // Debug log for high scores
+      if (score >= 0.8) {
+        console.log(`  High match: "${icon.name}" (score: ${score}, iconName: ${iconNameScore}, alias: ${aliasScore}${matchedAlias ? ` via "${matchedAlias}"` : ''})`)
+      }
     }
 
     if (bestScore === 1.0) break
@@ -177,9 +190,11 @@ async function findIconForService(serviceName) {
       category = bestMatch.categories[0]
     }
 
+    console.log(`  ✓ Found: "${iconName}" (score: ${bestScore})`)
     return { name: iconName, category }
   }
 
+  console.log(`  ✗ No match found (best score: ${bestScore})`)
   return null
 }
 
