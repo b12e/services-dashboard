@@ -378,19 +378,48 @@ docker exec services-dashboard ls -la /usr/share/nginx/html/services.json
 - Verify manifest.json is accessible
 - Check browser console for PWA-related errors
 
-### Duplicates between NPM and services.json
+### Merging NPM and services.json
 
-The dashboard automatically deduplicates services by URL. **Manual services in `services.json` always take priority** over NPM auto-detected services when URLs match.
+The dashboard intelligently merges services when the same URL exists in both `services.json` and NPM:
 
-Check the Docker logs to see deduplication details:
+**Merge Behavior:**
+- If a URL exists in both sources, the service is **merged** (not skipped)
+- **Name** from services.json takes priority
+- **Icon** from services.json takes priority (if specified)
+- **Category** from services.json takes priority (if specified)
+- **URL and metadata** from NPM are kept
+
+**Example:**
+```json
+// In services.json:
+{
+  "name": "My Plex Server",
+  "url": "plex.example.com",
+  "icon": "plex",
+  "category": "Media"
+}
+
+// NPM has: https://plex.example.com (auto-detected)
+
+// Result: Uses "My Plex Server" name and "plex" icon,
+// but keeps NPM's URL and SSL detection
+```
+
+**Why this is useful:**
+- Override auto-generated names with friendly names
+- Specify custom icons instead of auto-detected ones
+- Set custom categories
+- Still benefit from NPM's automatic URL and SSL detection
+
+Check the Docker logs to see merge details:
 ```bash
 docker logs services-dashboard
 ```
 
 Look for messages like:
 ```
-Merged 10 manual + 25 NPM = 30 total (5 duplicates)
-Skipping NPM service "Plex" - URL already exists
+Merged 5 services (using manual name/icon with NPM URL)
+Final result: 30 total services (10 manual, 25 NPM, 5 merged)
 ```
 
 ## Browser Support

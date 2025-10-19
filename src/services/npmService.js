@@ -48,17 +48,17 @@ function normalizeUrl(url) {
 
 /**
  * Merge NPM services with manually configured services
- * Deduplicates based on URL (manual services take priority)
+ * If same URL exists in both, use name/icon from manual services.json but keep NPM's URL/metadata
  * @param {Array} manualServices - Manually configured services
  * @param {Array} npmServices - Auto-detected NPM services
  * @returns {Array} - Merged services array
  */
 export function mergeServices(manualServices = [], npmServices = []) {
   const urlMap = new Map()
-  const nameMap = new Map()
-  let duplicatesSkipped = 0
+  const manualOverrides = new Map()
+  let duplicatesMerged = 0
 
-  // Add manual services first (they take priority)
+  // First pass: Index manual services by normalized URL
   manualServices.forEach(service => {
     if (!service || !service.url) {
       console.warn('Skipping manual service with no URL:', service?.name || 'unnamed')
@@ -67,14 +67,18 @@ export function mergeServices(manualServices = [], npmServices = []) {
 
     const normalizedUrl = normalizeUrl(service.url)
     if (normalizedUrl) {
+      // Store both the full service and an override object
       urlMap.set(normalizedUrl, service)
-      if (service.name) {
-        nameMap.set(service.name.toLowerCase(), normalizedUrl)
-      }
+      manualOverrides.set(normalizedUrl, {
+        name: service.name,
+        icon: service.icon,
+        category: service.category,
+        // Store any other manual overrides you want to preserve
+      })
     }
   })
 
-  // Add NPM services only if they don't conflict
+  // Second pass: Add NPM services, merging with manual overrides if URL matches
   npmServices.forEach(service => {
     if (!service || !service.url) {
       console.warn('Skipping NPM service with no URL:', service?.name || 'unnamed')
@@ -82,33 +86,43 @@ export function mergeServices(manualServices = [], npmServices = []) {
     }
 
     const normalizedUrl = normalizeUrl(service.url)
-    const normalizedName = service.name?.toLowerCase()
 
-    // Check for URL conflict
+    // Check if this URL exists in manual services
     if (urlMap.has(normalizedUrl)) {
-      duplicatesSkipped++
-      console.log(`Skipping NPM service "${service.name}" - URL already exists in manual services`)
-      return
-    }
+      const manualOverride = manualOverrides.get(normalizedUrl)
 
-    // Check for name conflict (optional, just warn)
-    if (normalizedName && nameMap.has(normalizedName)) {
-      console.warn(`NPM service "${service.name}" has same name as manual service but different URL`)
-    }
+      // Merge: Use manual name/icon/category, but keep NPM's URL and metadata
+      const mergedService = {
+        ...service, // Start with NPM service (has URL, appendBaseDomain, _npmMetadata, etc.)
+        name: manualOverride.name, // Override with manual name
+      }
 
-    // Add the NPM service
-    urlMap.set(normalizedUrl, service)
-    if (normalizedName) {
-      nameMap.set(normalizedName, normalizedUrl)
+      // Only override icon if manual service has one
+      if (manualOverride.icon) {
+        mergedService.icon = manualOverride.icon
+      }
+
+      // Only override category if manual service has one
+      if (manualOverride.category) {
+        mergedService.category = manualOverride.category
+      }
+
+      urlMap.set(normalizedUrl, mergedService)
+      duplicatesMerged++
+      console.log(`Merged NPM service with manual override for "${manualOverride.name}" (${normalizedUrl})`)
+    } else {
+      // No conflict, just add the NPM service
+      urlMap.set(normalizedUrl, service)
     }
   })
 
-  if (duplicatesSkipped > 0) {
-    console.log(`Skipped ${duplicatesSkipped} duplicate NPM services (already in manual services)`)
+  const merged = Array.from(urlMap.values())
+
+  if (duplicatesMerged > 0) {
+    console.log(`Merged ${duplicatesMerged} services (using manual name/icon with NPM URL)`)
   }
 
-  const merged = Array.from(urlMap.values())
-  console.log(`Merged ${manualServices.length} manual + ${npmServices.length} NPM services = ${merged.length} total (${duplicatesSkipped} duplicates removed)`)
+  console.log(`Final result: ${merged.length} total services (${manualServices.length} manual, ${npmServices.length} NPM, ${duplicatesMerged} merged)`)
 
   return merged
 }
