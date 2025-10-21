@@ -85,7 +85,7 @@ function App() {
         const mergedServices = await mergeServices(manualServices, npmServices, baseUrl)
 
         if (mergedServices.length === 0) {
-          throw new Error('No services found. Please configure services.json or NPM integration.')
+          throw new Error('No services configured. Visit the admin panel at port 3001 to add services or configure NPM integration.')
         }
 
         // Auto-categorize all services (now returns array of categories)

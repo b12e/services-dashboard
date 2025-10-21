@@ -48,6 +48,48 @@ app.use(session({
   }
 }))
 
+// NPM authentication utility
+async function authenticateNPM(apiUrl, username, password) {
+  try {
+    const response = await fetch(`${apiUrl}/tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        identity: username,
+        secret: password,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`NPM authentication failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.token
+  } catch (error) {
+    throw new Error(`NPM authentication error: ${error.message}`)
+  }
+}
+
+// Validate NPM connection
+async function validateNPMConnection(connection) {
+  try {
+    const apiUrl = connection.url.replace(/\/api$/, '') + '/api'
+
+    if (!connection.username || !connection.password) {
+      return { valid: false, error: 'Username and password are required' }
+    }
+
+    // Try to authenticate
+    await authenticateNPM(apiUrl, connection.username, connection.password)
+    return { valid: true }
+  } catch (error) {
+    return { valid: false, error: error.message }
+  }
+}
+
 // Serve static files for assets (no auth required for CSS/JS/images)
 app.use('/assets', express.static(path.join(__dirname, 'admin-dist', 'assets')))
 app.use('/icon.svg', express.static(path.join(__dirname, 'public', 'icon.svg')))
@@ -64,7 +106,18 @@ async function ensureFiles() {
   try {
     await fs.access(SERVICES_PATH)
   } catch {
-    await fs.writeFile(SERVICES_PATH, JSON.stringify({ services: [] }, null, 2))
+    // Create default services.json with Google.com as example
+    await fs.writeFile(SERVICES_PATH, JSON.stringify({
+      manualServices: [
+        {
+          name: 'Google',
+          url: 'https://google.com',
+          appendBaseDomain: false,
+          icon: 'google'
+        }
+      ],
+      overrides: {}
+    }, null, 2))
   }
 
   try {
@@ -363,77 +416,167 @@ app.delete('/api/admin/auth/passkeys/:index', requireAuth, async (req, res) => {
   }
 })
 
-// GET /api/admin/services - Get all services
-app.get('/api/admin/services', requireAuth, async (req, res) => {
+// Helper to load services data
+async function loadServicesData() {
   try {
     const data = await fs.readFile(SERVICES_PATH, 'utf-8')
     const json = JSON.parse(data)
-    res.json(json.services || [])
+    return {
+      manualServices: json.manualServices || [],
+      overrides: json.overrides || {}
+    }
+  } catch (error) {
+    return { manualServices: [], overrides: {} }
+  }
+}
+
+// Helper to save services data
+async function saveServicesData(manualServices, overrides) {
+  const json = {
+    manualServices,
+    overrides
+  }
+  await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
+}
+
+// Helper to fetch NPM services
+async function fetchNPMServicesForAdmin() {
+  try {
+    const mainServerUrl = process.env.MAIN_SERVER_URL || 'http://localhost:3000'
+    const response = await fetch(`${mainServerUrl}/api/npm/services`)
+    if (!response.ok) return []
+    return await response.json()
+  } catch (error) {
+    console.error('Failed to fetch NPM services:', error)
+    return []
+  }
+}
+
+// GET /api/admin/services - Get all services (NPM + manual + overrides)
+app.get('/api/admin/services', requireAuth, async (req, res) => {
+  try {
+    const config = await fs.readFile(CONFIG_PATH, 'utf-8').then(d => JSON.parse(d)).catch(() => ({}))
+    const { manualServices, overrides } = await loadServicesData()
+
+    let allServices = []
+
+    // Add manual services
+    manualServices.forEach((service, index) => {
+      allServices.push({
+        ...service,
+        _id: `manual_${index}`,
+        _source: 'manual',
+        _index: index
+      })
+    })
+
+    // If NPM is enabled, fetch NPM services
+    if (config.npmEnabled) {
+      const npmServices = await fetchNPMServicesForAdmin()
+      npmServices.forEach(service => {
+        const npmId = service._npmMetadata?.id
+        if (!npmId) return
+
+        const serviceId = `npm_${npmId}`
+        const override = overrides[serviceId] || {}
+
+        allServices.push({
+          ...service,
+          ...override,
+          _id: serviceId,
+          _source: 'npm',
+          _npmData: service,
+          _hasOverrides: Object.keys(override).length > 0
+        })
+      })
+    }
+
+    res.json(allServices)
   } catch (error) {
     console.error('Error reading services:', error)
     res.status(500).json({ error: 'Failed to read services' })
   }
 })
 
-// POST /api/admin/services - Add a new service
+// POST /api/admin/services - Add a new manual service
 app.post('/api/admin/services', requireAuth, async (req, res) => {
   try {
     const newService = req.body
-    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
-    const json = JSON.parse(data)
+    const { manualServices, overrides } = await loadServicesData()
 
-    if (!json.services) {
-      json.services = []
-    }
+    manualServices.push(newService)
+    await saveServicesData(manualServices, overrides)
 
-    json.services.push(newService)
-    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
-
-    res.json(newService)
+    res.json({
+      ...newService,
+      _id: `manual_${manualServices.length - 1}`,
+      _source: 'manual'
+    })
   } catch (error) {
     console.error('Error adding service:', error)
     res.status(500).json({ error: 'Failed to add service' })
   }
 })
 
-// PUT /api/admin/services/:index - Update a service
-app.put('/api/admin/services/:index', requireAuth, async (req, res) => {
+// PUT /api/admin/services/:id - Update a service or create/update override
+app.put('/api/admin/services/:id', requireAuth, async (req, res) => {
   try {
-    const index = parseInt(req.params.index)
-    const updatedService = req.body
+    const serviceId = req.params.id
+    const updatedData = req.body
+    const { manualServices, overrides } = await loadServicesData()
 
-    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
-    const json = JSON.parse(data)
+    if (serviceId.startsWith('manual_')) {
+      // Update manual service
+      const index = parseInt(serviceId.replace('manual_', ''))
+      if (index < 0 || index >= manualServices.length) {
+        return res.status(404).json({ error: 'Service not found' })
+      }
+      manualServices[index] = updatedData
+    } else if (serviceId.startsWith('npm_')) {
+      // Create or update override for NPM service
+      // Only store the fields that are being overridden
+      const override = {}
+      if (updatedData.name !== undefined) override.name = updatedData.name
+      if (updatedData.icon !== undefined) override.icon = updatedData.icon
+      if (updatedData.categories !== undefined) override.categories = updatedData.categories
+      if (updatedData.hidden !== undefined) override.hidden = updatedData.hidden
 
-    if (!json.services || index < 0 || index >= json.services.length) {
-      return res.status(404).json({ error: 'Service not found' })
+      overrides[serviceId] = override
+    } else {
+      return res.status(400).json({ error: 'Invalid service ID' })
     }
 
-    json.services[index] = updatedService
-    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
-
-    res.json(updatedService)
+    await saveServicesData(manualServices, overrides)
+    res.json(updatedData)
   } catch (error) {
     console.error('Error updating service:', error)
     res.status(500).json({ error: 'Failed to update service' })
   }
 })
 
-// DELETE /api/admin/services/:index - Delete a service
-app.delete('/api/admin/services/:index', requireAuth, async (req, res) => {
+// DELETE /api/admin/services/:id - Delete a service or remove override
+app.delete('/api/admin/services/:id', requireAuth, async (req, res) => {
   try {
-    const index = parseInt(req.params.index)
+    const serviceId = req.params.id
+    const { manualServices, overrides } = await loadServicesData()
 
-    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
-    const json = JSON.parse(data)
-
-    if (!json.services || index < 0 || index >= json.services.length) {
-      return res.status(404).json({ error: 'Service not found' })
+    if (serviceId.startsWith('manual_')) {
+      // Delete manual service
+      const index = parseInt(serviceId.replace('manual_', ''))
+      if (index < 0 || index >= manualServices.length) {
+        return res.status(404).json({ error: 'Service not found' })
+      }
+      manualServices.splice(index, 1)
+    } else if (serviceId.startsWith('npm_')) {
+      // Remove override (or set hidden to true)
+      if (overrides[serviceId]) {
+        delete overrides[serviceId]
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid service ID' })
     }
 
-    json.services.splice(index, 1)
-    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
-
+    await saveServicesData(manualServices, overrides)
     res.json({ success: true })
   } catch (error) {
     console.error('Error deleting service:', error)
@@ -457,8 +600,44 @@ app.get('/api/admin/config', requireAuth, async (req, res) => {
 app.put('/api/admin/config', requireAuth, async (req, res) => {
   try {
     const config = req.body
+
+    // Validate NPM connections if enabled
+    const validationResults = []
+    if (config.npmEnabled && config.npmConnections && config.npmConnections.length > 0) {
+      for (let i = 0; i < config.npmConnections.length; i++) {
+        const conn = config.npmConnections[i]
+        if (conn.url && conn.username && conn.password) {
+          console.log(`Validating NPM connection: ${conn.name || conn.url}`)
+          const result = await validateNPMConnection(conn)
+          validationResults.push({
+            index: i,
+            name: conn.name || conn.url,
+            valid: result.valid,
+            error: result.error
+          })
+        }
+      }
+    }
+
+    // Save config
     await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
-    res.json(config)
+
+    // Trigger NPM fetch on the main server if NPM is enabled
+    if (config.npmEnabled) {
+      try {
+        const mainServerUrl = process.env.MAIN_SERVER_URL || 'http://localhost:3000'
+        await fetch(`${mainServerUrl}/api/npm/refresh`, { method: 'POST' })
+        console.log('Triggered NPM refresh on main server')
+      } catch (error) {
+        console.error('Failed to trigger NPM refresh:', error.message)
+      }
+    }
+
+    res.json({
+      config,
+      validationResults,
+      success: true
+    })
   } catch (error) {
     console.error('Error updating config:', error)
     res.status(500).json({ error: 'Failed to update configuration' })

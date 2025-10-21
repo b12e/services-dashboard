@@ -260,65 +260,83 @@ async function convertProxyHostToService(proxyHost) {
   }
 }
 
+// Shared function to fetch NPM services
+async function fetchNPMServices() {
+  // Reload config to get latest NPM connections
+  await loadConfig()
+
+  // Check if NPM is configured
+  if (!NPM_CONFIG.enabled || !NPM_CONFIG.connections || NPM_CONFIG.connections.length === 0) {
+    console.log('NPM integration not configured')
+    return []
+  }
+
+  console.log(`Fetching services from ${NPM_CONFIG.connections.length} NPM instance(s)...`)
+
+  const allServices = []
+
+  // Fetch from all NPM connections
+  for (const connection of NPM_CONFIG.connections) {
+    try {
+      console.log(`Fetching from NPM: ${connection.name || connection.url}`)
+
+      // Authenticate with NPM - get token from username/password
+      let token
+      const apiUrl = connection.url.replace(/\/api$/, '') + '/api'
+
+      if (connection.username && connection.password) {
+        // Get token via authentication
+        token = await authenticateNPM(apiUrl, connection.username, connection.password)
+      } else if (connection.token) {
+        // Use token directly (backward compatibility)
+        token = connection.token
+      } else {
+        throw new Error('No credentials provided (need username/password or token)')
+      }
+
+      // Fetch proxy hosts
+      const proxyHosts = await fetchProxyHosts(apiUrl, token)
+      console.log(`Found ${proxyHosts.length} proxy hosts from ${connection.name || connection.url}`)
+
+      // Filter only enabled hosts
+      const enabledHosts = proxyHosts.filter(host => host.enabled === 1 || host.enabled === true)
+
+      // Convert to service format with icon discovery
+      const services = await Promise.all(
+        enabledHosts.map(host => convertProxyHostToService(host))
+      )
+
+      allServices.push(...services)
+    } catch (error) {
+      console.error(`Failed to fetch from NPM ${connection.name || connection.url}:`, error.message)
+      // Continue with other connections
+    }
+  }
+
+  console.log(`Total converted services: ${allServices.length}`)
+  return allServices
+}
+
 // API endpoint to get NPM services
 app.get('/api/npm/services', async (req, res) => {
   try {
-    // Reload config to get latest NPM connections
-    await loadConfig()
-
-    // Check if NPM is configured
-    if (!NPM_CONFIG.enabled || !NPM_CONFIG.connections || NPM_CONFIG.connections.length === 0) {
-      console.log('NPM integration not configured')
-      return res.json([])
-    }
-
-    console.log(`Fetching services from ${NPM_CONFIG.connections.length} NPM instance(s)...`)
-
-    const allServices = []
-
-    // Fetch from all NPM connections
-    for (const connection of NPM_CONFIG.connections) {
-      try {
-        console.log(`Fetching from NPM: ${connection.name || connection.url}`)
-
-        // Authenticate with NPM - get token from username/password
-        let token
-        const apiUrl = connection.url.replace(/\/api$/, '') + '/api'
-
-        if (connection.username && connection.password) {
-          // Get token via authentication
-          token = await authenticateNPM(apiUrl, connection.username, connection.password)
-        } else if (connection.token) {
-          // Use token directly (backward compatibility)
-          token = connection.token
-        } else {
-          throw new Error('No credentials provided (need username/password or token)')
-        }
-
-        // Fetch proxy hosts
-        const proxyHosts = await fetchProxyHosts(apiUrl, token)
-        console.log(`Found ${proxyHosts.length} proxy hosts from ${connection.name || connection.url}`)
-
-        // Filter only enabled hosts
-        const enabledHosts = proxyHosts.filter(host => host.enabled === 1 || host.enabled === true)
-
-        // Convert to service format with icon discovery
-        const services = await Promise.all(
-          enabledHosts.map(host => convertProxyHostToService(host))
-        )
-
-        allServices.push(...services)
-      } catch (error) {
-        console.error(`Failed to fetch from NPM ${connection.name || connection.url}:`, error.message)
-        // Continue with other connections
-      }
-    }
-
-    console.log(`Total converted services: ${allServices.length}`)
+    const allServices = await fetchNPMServices()
     res.json(allServices)
   } catch (error) {
     console.error('Failed to fetch NPM services:', error)
     res.status(500).json({ error: 'Failed to fetch NPM services', message: error.message })
+  }
+})
+
+// API endpoint to trigger NPM refresh
+app.post('/api/npm/refresh', async (req, res) => {
+  try {
+    console.log('NPM refresh triggered by admin server')
+    const allServices = await fetchNPMServices()
+    res.json({ success: true, servicesCount: allServices.length })
+  } catch (error) {
+    console.error('Failed to refresh NPM services:', error)
+    res.status(500).json({ error: 'Failed to refresh NPM services', message: error.message })
   }
 })
 
@@ -327,7 +345,7 @@ app.get('/api/config', async (req, res) => {
   try {
     const config = await loadConfig()
     res.json({
-      baseUrl: process.env.BASE_URL || config.baseUrl || '',
+      baseUrl: config.baseUrl || '',
       npmEnabled: config.npmEnabled || false
     })
   } catch (error) {
@@ -336,14 +354,63 @@ app.get('/api/config', async (req, res) => {
   }
 })
 
-// Serve services.json if it exists
-app.get('/services.json', async (req, res) => {
+// Helper function to load service overrides
+async function loadServiceOverrides() {
   try {
     const servicesPath = join(DATA_DIR, 'services.json')
     const data = await readFile(servicesPath, 'utf-8')
-    res.json(JSON.parse(data))
+    const json = JSON.parse(data)
+    return {
+      manualServices: json.manualServices || [],
+      overrides: json.overrides || {}
+    }
   } catch (error) {
-    // File doesn't exist, return empty services array
+    return { manualServices: [], overrides: {} }
+  }
+}
+
+// Helper function to merge NPM service with overrides
+function mergeServiceWithOverride(service, override) {
+  if (!override) return service
+
+  return {
+    ...service,
+    ...(override.name !== undefined && { name: override.name }),
+    ...(override.icon !== undefined && { icon: override.icon }),
+    ...(override.categories !== undefined && { categories: override.categories }),
+    ...(override.hidden !== undefined && { hidden: override.hidden }),
+    _isNpmDiscovered: true,
+    _hasOverrides: true
+  }
+}
+
+// Serve services.json - merges NPM services with overrides and manual services
+app.get('/services.json', async (req, res) => {
+  try {
+    const config = await loadConfig()
+    const { manualServices, overrides } = await loadServiceOverrides()
+
+    let allServices = [...manualServices]
+
+    // If NPM is enabled, fetch and merge NPM services
+    if (config.npmEnabled && config.npmConnections?.length > 0) {
+      const npmServices = await fetchNPMServices()
+
+      // Apply overrides to NPM services
+      const mergedNpmServices = npmServices.map(service => {
+        const serviceId = service._npmMetadata?.id
+        const override = serviceId ? overrides[`npm_${serviceId}`] : null
+        return mergeServiceWithOverride(service, override)
+      })
+
+      // Filter out hidden NPM services
+      const visibleNpmServices = mergedNpmServices.filter(s => !s.hidden)
+      allServices = [...allServices, ...visibleNpmServices]
+    }
+
+    res.json({ services: allServices })
+  } catch (error) {
+    console.error('Error building services list:', error)
     res.json({ services: [] })
   }
 })
@@ -371,6 +438,5 @@ app.listen(PORT, () => {
   console.log('===================================')
   console.log(`Listening on port ${PORT}`)
   console.log(`Data directory: ${DATA_DIR}`)
-  console.log(`Base URL: ${process.env.BASE_URL || '(from config.json)'}`)
   console.log('===================================')
 })

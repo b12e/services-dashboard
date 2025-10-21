@@ -74,10 +74,16 @@ function AdminApp() {
             Services
           </button>
           <button
+            className={activeTab === 'categories' ? 'active' : ''}
+            onClick={() => setActiveTab('categories')}
+          >
+            Categories
+          </button>
+          <button
             className={activeTab === 'config' ? 'active' : ''}
             onClick={() => setActiveTab('config')}
           >
-            Configuration
+            Settings
           </button>
           {authStatus.authRequired && (
             <button onClick={handleLogout} className="btn-logout">
@@ -89,10 +95,10 @@ function AdminApp() {
 
       <main className="admin-content">
         {activeTab === 'services' && <ServicesManager />}
+        {activeTab === 'categories' && <CategoryManager />}
         {activeTab === 'config' && (
           <>
             <ConfigManager />
-            <CategoryManager />
             {authStatus.authRequired && <PasskeyManager />}
           </>
         )}

@@ -8,6 +8,7 @@ function ConfigManager() {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [validationResults, setValidationResults] = useState([])
 
   useEffect(() => {
     loadConfig()
@@ -28,6 +29,7 @@ function ConfigManager() {
 
   async function handleSave() {
     setSaving(true)
+    setValidationResults([])
     try {
       const response = await fetch('/api/admin/config', {
         method: 'PUT',
@@ -36,7 +38,18 @@ function ConfigManager() {
       })
 
       if (response.ok) {
-        alert('Configuration saved successfully! Please restart both servers for changes to take effect.')
+        const result = await response.json()
+        setValidationResults(result.validationResults || [])
+
+        // Show summary of validation results
+        const failedConnections = result.validationResults?.filter(r => !r.valid) || []
+        if (failedConnections.length > 0) {
+          alert(`Configuration saved, but ${failedConnections.length} NPM connection(s) failed validation. Check the connection status below.`)
+        } else if (result.validationResults?.length > 0) {
+          alert('Configuration saved successfully! All NPM connections validated and services are being fetched.')
+        } else {
+          alert('Configuration saved successfully!')
+        }
       } else {
         alert('Failed to save configuration')
       }
@@ -144,56 +157,69 @@ function ConfigManager() {
             {config.npmConnections && config.npmConnections.length === 0 ? (
               <p className="empty-state">No NPM connections configured</p>
             ) : (
-              config.npmConnections?.map((conn, index) => (
-                <div key={index} className="npm-connection-item">
-                  <div className="form-group">
-                    <label>Connection Name</label>
-                    <input
-                      type="text"
-                      value={conn.name}
-                      onChange={(e) => updateNpmConnection(index, 'name', e.target.value)}
-                      placeholder="e.g., Main NPM Server"
-                    />
-                  </div>
+              config.npmConnections?.map((conn, index) => {
+                const validation = validationResults.find(v => v.index === index)
+                return (
+                  <div key={index} className="npm-connection-item">
+                    <div className="form-group">
+                      <label>Connection Name</label>
+                      <input
+                        type="text"
+                        value={conn.name}
+                        onChange={(e) => updateNpmConnection(index, 'name', e.target.value)}
+                        placeholder="e.g., Main NPM Server"
+                      />
+                    </div>
 
-                  <div className="form-group">
-                    <label>NPM URL</label>
-                    <input
-                      type="text"
-                      value={conn.url}
-                      onChange={(e) => updateNpmConnection(index, 'url', e.target.value)}
-                      placeholder="http://nginx-proxy-manager:81"
-                    />
-                  </div>
+                    <div className="form-group">
+                      <label>NPM URL</label>
+                      <input
+                        type="text"
+                        value={conn.url}
+                        onChange={(e) => updateNpmConnection(index, 'url', e.target.value)}
+                        placeholder="http://nginx-proxy-manager:81"
+                      />
+                    </div>
 
-                  <div className="form-group">
-                    <label>Username (Email)</label>
-                    <input
-                      type="text"
-                      value={conn.username || ''}
-                      onChange={(e) => updateNpmConnection(index, 'username', e.target.value)}
-                      placeholder="admin@example.com"
-                    />
-                  </div>
+                    <div className="form-group">
+                      <label>Username (Email)</label>
+                      <input
+                        type="text"
+                        value={conn.username || ''}
+                        onChange={(e) => updateNpmConnection(index, 'username', e.target.value)}
+                        placeholder="admin@example.com"
+                      />
+                    </div>
 
-                  <div className="form-group">
-                    <label>Password</label>
-                    <input
-                      type="password"
-                      value={conn.password || ''}
-                      onChange={(e) => updateNpmConnection(index, 'password', e.target.value)}
-                      placeholder="Your NPM password"
-                    />
-                  </div>
+                    <div className="form-group">
+                      <label>Password</label>
+                      <input
+                        type="password"
+                        value={conn.password || ''}
+                        onChange={(e) => updateNpmConnection(index, 'password', e.target.value)}
+                        placeholder="Your NPM password"
+                      />
+                    </div>
 
-                  <button
-                    onClick={() => removeNpmConnection(index)}
-                    className="btn-danger btn-small"
-                  >
-                    Remove Connection
-                  </button>
-                </div>
-              ))
+                    {validation && (
+                      <div className={`validation-status ${validation.valid ? 'success' : 'error'}`}>
+                        {validation.valid ? (
+                          <span>✓ Connection validated successfully</span>
+                        ) : (
+                          <span>✗ {validation.error}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => removeNpmConnection(index)}
+                      className="btn-danger btn-small"
+                    >
+                      Remove Connection
+                    </button>
+                  </div>
+                )
+              })
             )}
           </div>
         )}

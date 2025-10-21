@@ -23,9 +23,6 @@ services:
       - "3000:3000"  # Dashboard
       - "3001:3001"  # Admin panel
     environment:
-      # Base domain (optional)
-      - BASE_URL=example.com
-
       # Admin auth (optional, disabled by default)
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=your-password
@@ -49,7 +46,6 @@ docker run -d \
   --name services-dashboard \
   -p 3000:3000 \
   -p 3001:3001 \
-  -e BASE_URL=example.com \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=your-password \
   -v ~/services-dashboard/data:/app/data \
@@ -130,15 +126,18 @@ Create `data/config.json`:
 
 | Variable | Description |
 |----------|-------------|
-| `BASE_URL` | Base domain for services (e.g., `example.com`) |
 | `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
 | `ADMIN_PASSWORD` | Admin panel password |
 
 ## Service Fields
 
 - `name` - Display name
-- `url` - Service URL or subdomain
-- `appendBaseDomain` - Add BASE_URL to URL (default: true)
+- `url` - Service URL (subdomain or full URL with protocol/port/path)
+- `appendBaseDomain` - If true, URL is treated as subdomain and base domain is appended (default: true)
 - `icon` - Icon name (optional, auto-detected)
 - `category` - Category (optional, auto-detected)
 - `hidden` - Hide from dashboard (default: false)
+
+**URL Examples:**
+- Subdomain mode (`appendBaseDomain: true`): `url: "plex"` becomes `plex.example.com`
+- Full URL mode (`appendBaseDomain: false`): `url: "https://example.com:8080/path"`

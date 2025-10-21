@@ -44,9 +44,9 @@ function ServicesManager() {
     }
   }
 
-  async function handleUpdate(index, updatedService) {
+  async function handleUpdate(serviceId, updatedService) {
     try {
-      const response = await fetch(`/api/admin/services/${index}`, {
+      const response = await fetch(`/api/admin/services/${serviceId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedService)
@@ -65,13 +65,17 @@ function ServicesManager() {
     }
   }
 
-  async function handleDelete(index) {
-    if (!confirm('Are you sure you want to delete this service?')) {
+  async function handleDelete(serviceId, source) {
+    const confirmMsg = source === 'npm'
+      ? 'Are you sure you want to remove all customizations for this NPM service?'
+      : 'Are you sure you want to delete this service?'
+
+    if (!confirm(confirmMsg)) {
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/services/${index}`, {
+      const response = await fetch(`/api/admin/services/${serviceId}`, {
         method: 'DELETE'
       })
 
@@ -86,8 +90,8 @@ function ServicesManager() {
     }
   }
 
-  function startEdit(index, service) {
-    setEditingIndex(index)
+  function startEdit(serviceId, service) {
+    setEditingIndex(serviceId)
     setEditForm({ ...service })
   }
 
@@ -123,30 +127,45 @@ function ServicesManager() {
         {services.length === 0 ? (
           <p className="empty-state">No services configured. Add one to get started!</p>
         ) : (
-          services.map((service, index) => (
-            <div key={index} className="service-item">
-              {editingIndex === index ? (
+          services.map((service) => (
+            <div key={service._id} className={`service-item ${service._source === 'npm' ? 'npm-source' : ''}`}>
+              {editingIndex === service._id ? (
                 <ServiceForm
                   initialData={editForm}
-                  onSubmit={(data) => handleUpdate(index, data)}
+                  onSubmit={(data) => handleUpdate(service._id, data)}
                   onCancel={cancelEdit}
                   isEditing
+                  isNpmService={service._source === 'npm'}
                 />
               ) : (
                 <div className="service-display">
                   <div className="service-info">
-                    <h3>{service.name || 'Unnamed Service'}</h3>
+                    <h3>
+                      {service.name || 'Unnamed Service'}
+                      {service._source === 'npm' && <span className="badge-npm">NPM</span>}
+                      {service._hasOverrides && <span className="badge-override">Customized</span>}
+                    </h3>
                     <div className="service-details">
+                      <div><strong>Source:</strong> {service._source === 'npm' ? 'NPM Auto-discovered' : 'Manual'}</div>
+                      <div><strong>URL Type:</strong> {service.appendBaseDomain !== false ? 'Subdomain' : 'Full URL'}</div>
                       <div><strong>URL:</strong> {service.url}</div>
                       <div><strong>Icon:</strong> {service.icon || 'Auto'}</div>
-                      <div><strong>Category:</strong> {service.category || 'Auto'}</div>
-                      <div><strong>Append Base Domain:</strong> {service.appendBaseDomain !== false ? 'Yes' : 'No'}</div>
+                      <div>
+                        <strong>Categories:</strong>{' '}
+                        {service.categories && service.categories.length > 0
+                          ? service.categories.join(', ')
+                          : (service.category || 'Auto')}
+                      </div>
                       {service.hidden && <div className="badge-hidden">Hidden</div>}
                     </div>
                   </div>
                   <div className="service-actions">
-                    <button onClick={() => startEdit(index, service)}>Edit</button>
-                    <button onClick={() => handleDelete(index)} className="btn-danger">Delete</button>
+                    <button onClick={() => startEdit(service._id, service)}>
+                      {service._source === 'npm' ? 'Customize' : 'Edit'}
+                    </button>
+                    <button onClick={() => handleDelete(service._id, service._source)} className="btn-danger">
+                      {service._source === 'npm' ? 'Reset' : 'Delete'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -158,39 +177,80 @@ function ServicesManager() {
   )
 }
 
-function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false }) {
+function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, isNpmService = false }) {
+  // Determine initial mode based on whether appendBaseDomain is true
+  const initialMode = initialData.appendBaseDomain !== false ? 'subdomain' : 'fqdn'
+
+  const [urlMode, setUrlMode] = useState(initialMode)
   const [formData, setFormData] = useState({
     name: initialData.name || '',
     url: initialData.url || '',
     icon: initialData.icon || '',
-    category: initialData.category || '',
-    appendBaseDomain: initialData.appendBaseDomain !== false,
+    categories: Array.isArray(initialData.categories) ? initialData.categories :
+                (initialData.category ? [initialData.category] : []),
     hidden: initialData.hidden || false
   })
+  const [categoryInput, setCategoryInput] = useState('')
 
   function handleChange(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  function handleModeChange(mode) {
+    setUrlMode(mode)
+    // Clear URL when switching modes to avoid confusion
+    setFormData(prev => ({ ...prev, url: '' }))
+  }
+
+  function addCategory() {
+    if (!categoryInput.trim()) return
+
+    const newCategory = categoryInput.trim()
+    if (!formData.categories.includes(newCategory)) {
+      setFormData(prev => ({
+        ...prev,
+        categories: [...prev.categories, newCategory]
+      }))
+    }
+    setCategoryInput('')
+  }
+
+  function removeCategory(index) {
+    setFormData(prev => ({
+      ...prev,
+      categories: prev.categories.filter((_, i) => i !== index)
+    }))
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
 
-    // Create clean object without empty strings
+    // Create clean object
     const cleanData = {
       name: formData.name,
-      url: formData.url,
-      appendBaseDomain: formData.appendBaseDomain
+      icon: formData.icon,
+      categories: formData.categories.length > 0 ? formData.categories : undefined,
+      hidden: formData.hidden
     }
 
-    if (formData.icon) cleanData.icon = formData.icon
-    if (formData.category) cleanData.category = formData.category
-    if (formData.hidden) cleanData.hidden = true
+    // For manual services, include URL data
+    if (!isNpmService) {
+      cleanData.url = formData.url
+      cleanData.appendBaseDomain = urlMode === 'subdomain'
+    }
 
     onSubmit(cleanData)
   }
 
   return (
     <form className="service-form" onSubmit={handleSubmit}>
+      {isNpmService && (
+        <div className="info-banner">
+          <strong>NPM Service:</strong> You can customize the display name, icon, category, and visibility.
+          The URL is managed by NPM and cannot be changed here.
+        </div>
+      )}
+
       <div className="form-group">
         <label>Name</label>
         <input
@@ -202,16 +262,67 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false }
         />
       </div>
 
-      <div className="form-group">
-        <label>URL</label>
-        <input
-          type="text"
-          value={formData.url}
-          onChange={(e) => handleChange('url', e.target.value)}
-          placeholder="e.g., plex or https://example.com"
-          required
-        />
-      </div>
+      {!isNpmService && (
+        <>
+          <div className="form-group">
+            <label>URL Type</label>
+            <div className="url-mode-toggle">
+              <label className={`mode-option ${urlMode === 'subdomain' ? 'active' : ''}`}>
+                <input
+                  type="radio"
+                  name="urlMode"
+                  value="subdomain"
+                  checked={urlMode === 'subdomain'}
+                  onChange={() => handleModeChange('subdomain')}
+                />
+                <span>Subdomain (uses base domain)</span>
+              </label>
+              <label className={`mode-option ${urlMode === 'fqdn' ? 'active' : ''}`}>
+                <input
+                  type="radio"
+                  name="urlMode"
+                  value="fqdn"
+                  checked={urlMode === 'fqdn'}
+                  onChange={() => handleModeChange('fqdn')}
+                />
+                <span>Full URL</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>
+              {urlMode === 'subdomain' ? 'Subdomain' : 'Full URL (with protocol, port, path)'}
+            </label>
+            <input
+              type="text"
+              value={formData.url}
+              onChange={(e) => handleChange('url', e.target.value)}
+              placeholder={urlMode === 'subdomain'
+                ? 'e.g., plex (will become plex.yourdomain.com)'
+                : 'e.g., https://example.com:8080/path'}
+              required
+            />
+            {urlMode === 'subdomain' && (
+              <p className="help-text">
+                This will be combined with the base domain configured in Settings
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {isNpmService && (
+        <div className="form-group">
+          <label>URL (managed by NPM)</label>
+          <input
+            type="text"
+            value={formData.url}
+            disabled
+            className="disabled-input"
+          />
+        </div>
+      )}
 
       <div className="form-group">
         <label>Icon (optional)</label>
@@ -224,24 +335,39 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false }
       </div>
 
       <div className="form-group">
-        <label>Category (optional)</label>
-        <input
-          type="text"
-          value={formData.category}
-          onChange={(e) => handleChange('category', e.target.value)}
-          placeholder="e.g., Media, Development (leave empty for auto)"
-        />
-      </div>
-
-      <div className="form-group checkbox">
-        <label>
+        <label>Categories (optional)</label>
+        <div className="category-input-group">
           <input
-            type="checkbox"
-            checked={formData.appendBaseDomain}
-            onChange={(e) => handleChange('appendBaseDomain', e.target.checked)}
+            type="text"
+            value={categoryInput}
+            onChange={(e) => setCategoryInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCategory())}
+            placeholder="e.g., Media, Development"
           />
-          Append base domain to URL
-        </label>
+          <button type="button" onClick={addCategory} className="btn-small">
+            Add
+          </button>
+        </div>
+        {formData.categories.length > 0 && (
+          <div className="category-tags">
+            {formData.categories.map((cat, index) => (
+              <span key={index} className="category-tag">
+                {cat}
+                <button
+                  type="button"
+                  onClick={() => removeCategory(index)}
+                  className="remove-tag"
+                  aria-label="Remove category"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="help-text">
+          Leave empty for auto-detection. Press Enter or click Add to add multiple categories.
+        </p>
       </div>
 
       <div className="form-group checkbox">
