@@ -156,16 +156,12 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     }
   }
 
-  // Sanitize and validate the icon name before rendering
-  const sanitizedInputValue = sanitizeIconName(inputValue)
-  const isInputValueValid = isValidIconName(inputValue, icons)
-
   return (
     <div className="icon-autocomplete" ref={wrapperRef}>
       <div className="icon-input-wrapper">
-        {sanitizedInputValue && isInputValueValid && (
+        {iconPreviewUrl && (
           <img
-            src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${sanitizedInputValue}.svg`}
+            src={iconPreviewUrl}
             alt=""
             className="icon-preview-input"
             onError={(e) => e.target.style.display = 'none'}
@@ -184,15 +180,13 @@ function IconAutocomplete({ value, onChange, placeholder }) {
             }).slice(0, 10)
           ) && setShowSuggestions(true)}
           placeholder={placeholder}
-          className={inputValue ? 'has-icon' : ''}
+          className={iconPreviewUrl ? 'has-icon' : ''}
         />
       </div>
 
       {showSuggestions && suggestions.length > 0 && (
         <div className="icon-suggestions">
           {suggestions.map((icon, index) => {
-            // Sanitize each icon name from the suggestions list
-            const sanitizedIconName = sanitizeIconName(icon.name)
             return (
               <div
                 key={icon.name}
@@ -200,12 +194,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                 onClick={() => handleSelectIcon(icon.name)}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
-                <img
-                  src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${sanitizedIconName}.svg`}
-                  alt={icon.name}
-                  className="icon-suggestion-preview"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
+                <IconPreview iconName={icon.name} />
                 <div className="icon-suggestion-info">
                   <div className="icon-suggestion-name">{icon.name}</div>
                   {icon.categories && icon.categories.length > 0 && (
