@@ -329,7 +329,8 @@ function ServicesManager() {
                     )}
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         )}
