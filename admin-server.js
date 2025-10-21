@@ -481,23 +481,18 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       return res.status(400).json({ error: 'Passkey not found' })
     }
 
-    // Convert Base64URL strings back to Uint8Arrays for the library
-    const credentialIDBuffer = isoBase64URL.toBuffer(passkey.credentialID)
-    const publicKeyBuffer = isoBase64URL.toBuffer(passkey.credentialPublicKey)
-
+    // In @simplewebauthn/server v13+, credentialID and credentialPublicKey should be Base64URL strings
     console.log('Passkey counter:', passkey.counter)
-    console.log('CredentialID buffer length:', credentialIDBuffer.length)
-    console.log('PublicKey buffer length:', publicKeyBuffer.length)
 
     const authenticator = {
-      credentialID: credentialIDBuffer,
-      credentialPublicKey: publicKeyBuffer,
+      credentialID: passkey.credentialID, // Keep as Base64URL string
+      credentialPublicKey: passkey.credentialPublicKey, // Keep as Base64URL string
       counter: passkey.counter,
     }
 
-    console.log('Authenticator object:', {
-      credentialID: authenticator.credentialID.length + ' bytes',
-      credentialPublicKey: authenticator.credentialPublicKey.length + ' bytes',
+    console.log('Authenticator object (Base64URL strings):', {
+      credentialID: authenticator.credentialID,
+      credentialPublicKeyLength: authenticator.credentialPublicKey?.length || 0,
       counter: authenticator.counter,
       hasTransports: !!passkey.transports,
       transports: passkey.transports
