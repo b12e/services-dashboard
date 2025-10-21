@@ -479,14 +479,22 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       return res.status(400).json({ error: 'Passkey not found' })
     }
 
+    // Convert Base64URL strings back to Uint8Arrays for the library
+    const credentialIDBuffer = isoBase64URL.toBuffer(passkey.credentialID)
+    const publicKeyBuffer = isoBase64URL.toBuffer(passkey.credentialPublicKey)
+
+    console.log('Passkey counter:', passkey.counter)
+    console.log('CredentialID buffer length:', credentialIDBuffer.length)
+    console.log('PublicKey buffer length:', publicKeyBuffer.length)
+
     const verification = await verifyAuthenticationResponse({
       response: credential,
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        credentialID: passkey.credentialID, // Base64URL string
-        credentialPublicKey: passkey.credentialPublicKey, // Base64URL string
+        credentialID: credentialIDBuffer,
+        credentialPublicKey: publicKeyBuffer,
         counter: passkey.counter,
       },
     })
