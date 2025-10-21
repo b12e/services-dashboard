@@ -138,6 +138,7 @@ if (!SESSION_SECRET) {
 
 const csrfProtection = doubleCsrf({
   getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
+  getSessionIdentifier: (req) => req.session?.id || req.sessionID || '', // Session identifier for token validation
   cookieName: process.env.NODE_ENV === 'production' ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
   cookieOptions: {
     httpOnly: true,
