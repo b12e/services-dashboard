@@ -116,15 +116,24 @@ app.use(session({
 }))
 
 // Configure CSRF protection
+// The csrf-csrf library requires the secret to be at least 32 characters
+const CSRF_SECRET = SESSION_SECRET.length >= 32
+  ? SESSION_SECRET
+  : SESSION_SECRET.padEnd(32, SESSION_SECRET)
+
+if (SESSION_SECRET.length < 32) {
+  console.warn('⚠️  WARNING: SESSION_SECRET is less than 32 characters. Please use a longer secret in production.')
+}
+
 const {
   generateToken, // Use this to create a CSRF token
   doubleCsrfProtection, // This is the middleware
 } = doubleCsrf({
-  getSecret: () => SESSION_SECRET, // Use the same secret as sessions
+  getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
   cookieName: process.env.NODE_ENV === 'production' ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
   cookieOptions: {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
     secure: process.env.NODE_ENV === 'production',
     path: '/',
   },
