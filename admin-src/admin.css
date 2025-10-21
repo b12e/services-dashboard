@@ -1,3 +1,18 @@
+:root {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2a2a2a;
+  --bg-tertiary: #333333;
+  --bg-input: #404040;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-muted: #707070;
+  --border-color: #404040;
+  --accent-blue: #4a9eff;
+  --accent-green: #28a745;
+  --accent-red: #dc3545;
+  --accent-yellow: #ffc107;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -10,8 +25,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f5f5f5;
-  color: #333;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .admin-app {
@@ -94,7 +109,7 @@ body {
 
 .manager-header h2 {
   font-size: 1.75rem;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .loading {
@@ -153,10 +168,11 @@ button:disabled {
 }
 
 .service-item {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
 }
 
 .service-display {
@@ -172,18 +188,18 @@ button:disabled {
 
 .service-info h3 {
   margin-bottom: 0.75rem;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .service-details {
   display: grid;
   gap: 0.5rem;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
 .service-details strong {
-  color: #333;
+  color: var(--text-primary);
   min-width: 150px;
   display: inline-block;
 }
@@ -250,18 +266,19 @@ button:disabled {
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #999;
-  background: white;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
   border-radius: 8px;
   font-size: 1rem;
+  border: 1px solid var(--border-color);
 }
 
 /* Forms */
 .service-form {
-  background: #f8f9fa;
+  background: var(--bg-secondary);
   padding: 1.5rem;
   border-radius: 6px;
-  border: 2px solid #e9ecef;
+  border: 2px solid var(--border-color);
 }
 
 .form-group {
@@ -272,7 +289,7 @@ button:disabled {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .form-group input[type="text"],
@@ -280,10 +297,12 @@ button:disabled {
 .form-group textarea {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 0.875rem;
   font-family: inherit;
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .form-group textarea {
@@ -295,8 +314,8 @@ button:disabled {
 .form-group input[type="password"]:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(74,158,255,0.2);
 }
 
 .form-group.checkbox {
@@ -321,7 +340,7 @@ button:disabled {
 .help-text {
   margin-top: 0.25rem;
   font-size: 0.8125rem;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .form-actions {
@@ -332,16 +351,17 @@ button:disabled {
 
 /* Config Manager */
 .config-section {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
 }
 
 .config-section h3 {
   margin-bottom: 1rem;
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-size: 1.25rem;
 }
 
@@ -353,7 +373,7 @@ button:disabled {
 }
 
 .subsection-header h4 {
-  color: #333;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
@@ -362,11 +382,11 @@ button:disabled {
 }
 
 .npm-connection-item {
-  background: #f8f9fa;
+  background: var(--bg-tertiary);
   padding: 1.5rem;
   border-radius: 6px;
   margin-bottom: 1rem;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-color);
 }
 
 .validation-status {
@@ -928,4 +948,226 @@ button:disabled {
 .category-edit-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Services Table */
+.services-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.services-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.services-filters input[type="text"],
+.services-filters select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.services-filters input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+}
+
+.services-filters select {
+  min-width: 120px;
+}
+
+.services-filters label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.services-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.services-table thead {
+  background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.services-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.services-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s;
+}
+
+.services-table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.services-table tbody tr.hidden-service {
+  opacity: 0.6;
+}
+
+.services-table td {
+  padding: 1rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.services-table td:first-child {
+  width: 50px;
+}
+
+.services-table .service-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.services-table .service-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.services-table .service-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.services-table .service-description {
+  color: var(--text-secondary);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.services-table .service-url {
+  color: var(--accent-blue);
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.services-table .service-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.services-table .category-tag {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-color);
+}
+
+.services-table .service-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.services-table button {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.service-count {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+/* Update mode toggle for dark theme */
+.url-mode-toggle .mode-option {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.url-mode-toggle .mode-option:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-tertiary);
+}
+
+.url-mode-toggle .mode-option.active {
+  border-color: var(--accent-blue);
+  background: var(--bg-tertiary);
+  color: var(--accent-blue);
+}
+
+/* Category edit input dark theme */
+.category-edit input {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.category-edit input:focus {
+  border-color: var(--accent-blue);
+}
+
+/* Icon autocomplete dark theme */
+.icon-suggestions {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+}
+
+.icon-suggestion-item {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.icon-suggestion-item:hover,
+.icon-suggestion-item.selected {
+  background: var(--bg-tertiary);
+}
+
+/* Select dropdowns */
+select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(74,158,255,0.2);
 }

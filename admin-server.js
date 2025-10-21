@@ -268,10 +268,13 @@ app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, r
 
     const authData = await loadAuthData()
 
+    // Convert user ID to Uint8Array (required by @simplewebauthn/server v10+)
+    const userID = new TextEncoder().encode('admin')
+
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
       rpID: rpID,
-      userID: 'admin',
+      userID: userID,
       userName: ADMIN_USERNAME || 'admin',
       attestationType: 'none',
       authenticatorSelection: {
