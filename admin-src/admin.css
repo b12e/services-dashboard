@@ -1126,6 +1126,19 @@ button:disabled {
   display: block;
 }
 
+.services-table .icon-fallback {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
 .services-table .service-icon {
   width: 32px;
   height: 32px;
