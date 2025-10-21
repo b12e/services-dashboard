@@ -21,11 +21,25 @@ app.use(express.static(distPath))
 // Parse JSON bodies
 app.use(express.json())
 
-// NPM configuration from environment variables
-const NPM_CONFIG = {
-  apiUrl: process.env.NPM_API_URL || '',
-  username: process.env.NPM_USERNAME || '',
-  password: process.env.NPM_PASSWORD || '',
+// Data directory for configuration
+const DATA_DIR = process.env.DATA_DIR || join(__dirname, '../data')
+const CONFIG_PATH = join(DATA_DIR, 'config.json')
+
+// Load NPM configuration from config.json
+let NPM_CONFIG = {
+  connections: []
+}
+
+async function loadConfig() {
+  try {
+    const data = await readFile(CONFIG_PATH, 'utf-8')
+    const config = JSON.parse(data)
+    NPM_CONFIG.connections = config.npmConnections || []
+    NPM_CONFIG.enabled = config.npmEnabled || false
+    return config
+  } catch {
+    return { baseUrl: '', npmEnabled: false, npmConnections: [] }
+  }
 }
 
 /**
@@ -249,31 +263,48 @@ async function convertProxyHostToService(proxyHost) {
 // API endpoint to get NPM services
 app.get('/api/npm/services', async (req, res) => {
   try {
+    // Reload config to get latest NPM connections
+    await loadConfig()
+
     // Check if NPM is configured
-    if (!NPM_CONFIG.apiUrl || !NPM_CONFIG.username || !NPM_CONFIG.password) {
+    if (!NPM_CONFIG.enabled || !NPM_CONFIG.connections || NPM_CONFIG.connections.length === 0) {
       console.log('NPM integration not configured')
       return res.json([])
     }
 
-    console.log('Fetching services from NPM...')
+    console.log(`Fetching services from ${NPM_CONFIG.connections.length} NPM instance(s)...`)
 
-    // Authenticate with NPM
-    const token = await authenticateNPM(NPM_CONFIG.apiUrl, NPM_CONFIG.username, NPM_CONFIG.password)
+    const allServices = []
 
-    // Fetch proxy hosts
-    const proxyHosts = await fetchProxyHosts(NPM_CONFIG.apiUrl, token)
-    console.log(`Found ${proxyHosts.length} proxy hosts in NPM`)
+    // Fetch from all NPM connections
+    for (const connection of NPM_CONFIG.connections) {
+      try {
+        console.log(`Fetching from NPM: ${connection.name || connection.url}`)
 
-    // Filter only enabled hosts
-    const enabledHosts = proxyHosts.filter(host => host.enabled === 1 || host.enabled === true)
+        // Authenticate with NPM using token directly (no username/password)
+        const token = connection.token
 
-    // Convert to service format with icon discovery
-    const services = await Promise.all(
-      enabledHosts.map(host => convertProxyHostToService(host))
-    )
+        // Fetch proxy hosts
+        const proxyHosts = await fetchProxyHosts(connection.url, token)
+        console.log(`Found ${proxyHosts.length} proxy hosts from ${connection.name || connection.url}`)
 
-    console.log(`Converted ${services.length} enabled proxy hosts to services`)
-    res.json(services)
+        // Filter only enabled hosts
+        const enabledHosts = proxyHosts.filter(host => host.enabled === 1 || host.enabled === true)
+
+        // Convert to service format with icon discovery
+        const services = await Promise.all(
+          enabledHosts.map(host => convertProxyHostToService(host))
+        )
+
+        allServices.push(...services)
+      } catch (error) {
+        console.error(`Failed to fetch from NPM ${connection.name || connection.url}:`, error.message)
+        // Continue with other connections
+      }
+    }
+
+    console.log(`Total converted services: ${allServices.length}`)
+    res.json(allServices)
   } catch (error) {
     console.error('Failed to fetch NPM services:', error)
     res.status(500).json({ error: 'Failed to fetch NPM services', message: error.message })
@@ -283,11 +314,11 @@ app.get('/api/npm/services', async (req, res) => {
 // API endpoint to get configuration (without sensitive data)
 app.get('/api/config', async (req, res) => {
   try {
-    const config = {
-      baseUrl: process.env.BASE_URL || '',
-      npmEnabled: !!(NPM_CONFIG.apiUrl && NPM_CONFIG.username && NPM_CONFIG.password)
-    }
-    res.json(config)
+    const config = await loadConfig()
+    res.json({
+      baseUrl: process.env.BASE_URL || config.baseUrl || '',
+      npmEnabled: config.npmEnabled || false
+    })
   } catch (error) {
     console.error('Failed to get config:', error)
     res.status(500).json({ error: 'Failed to get config' })
@@ -297,7 +328,7 @@ app.get('/api/config', async (req, res) => {
 // Serve services.json if it exists
 app.get('/services.json', async (req, res) => {
   try {
-    const servicesPath = join(distPath, 'services.json')
+    const servicesPath = join(DATA_DIR, 'services.json')
     const data = await readFile(servicesPath, 'utf-8')
     res.json(JSON.parse(data))
   } catch (error) {
@@ -314,20 +345,21 @@ app.get('*', (req, res) => {
 // Preload icon metadata on startup
 loadIconsMetadata().catch(err => console.error('Failed to preload icons metadata:', err))
 
+// Load config on startup
+loadConfig().then(config => {
+  console.log('✓ Configuration loaded')
+  if (config.npmEnabled && config.npmConnections?.length > 0) {
+    console.log(`✓ NPM integration: ${config.npmConnections.length} connection(s) configured`)
+  }
+}).catch(err => console.error('Failed to load config:', err))
+
 // Start server
 app.listen(PORT, () => {
   console.log('===================================')
   console.log('Services Dashboard - Server Started')
   console.log('===================================')
   console.log(`Listening on port ${PORT}`)
-
-  if (NPM_CONFIG.apiUrl) {
-    console.log('✓ NPM integration enabled')
-    console.log(`  API URL: ${NPM_CONFIG.apiUrl}`)
-  } else {
-    console.log('✓ NPM integration disabled (NPM_API_URL not set)')
-  }
-
-  console.log(`✓ Base URL: ${process.env.BASE_URL || '(not set)'}`)
+  console.log(`Data directory: ${DATA_DIR}`)
+  console.log(`Base URL: ${process.env.BASE_URL || '(from config.json)'}`)
   console.log('===================================')
 })

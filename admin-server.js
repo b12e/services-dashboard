@@ -27,10 +27,11 @@ const RP_NAME = 'Services Dashboard'
 const RP_ID = process.env.RP_ID || 'localhost'
 const ORIGIN = process.env.ORIGIN || `http://localhost:${PORT}`
 
-// Path to files
-const SERVICES_PATH = path.join(__dirname, 'public', 'services.json')
-const CONFIG_PATH = path.join(__dirname, 'config.json')
-const AUTH_PATH = path.join(__dirname, 'auth.json')
+// Path to files - all stored in /app/data directory
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
+const SERVICES_PATH = path.join(DATA_DIR, 'services.json')
+const CONFIG_PATH = path.join(DATA_DIR, 'config.json')
+const AUTH_PATH = path.join(DATA_DIR, 'auth.json')
 
 // In-memory storage for challenges (in production, use Redis or similar)
 const challenges = new Map()
@@ -51,8 +52,15 @@ app.use(session({
 app.use('/assets', express.static(path.join(__dirname, 'admin-dist', 'assets')))
 app.use('/icon.svg', express.static(path.join(__dirname, 'public', 'icon.svg')))
 
-// Middleware to ensure files exist
+// Middleware to ensure data directory and files exist
 async function ensureFiles() {
+  // Ensure data directory exists
+  try {
+    await fs.access(DATA_DIR)
+  } catch {
+    await fs.mkdir(DATA_DIR, { recursive: true })
+  }
+
   try {
     await fs.access(SERVICES_PATH)
   } catch {

@@ -54,9 +54,13 @@ RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/mai
 # Expose ports 3000 (main app) and 3001 (admin panel)
 EXPOSE 3000 3001
 
+# Create data directory for persistent configuration
+RUN mkdir -p /app/data
+
 # Set environment variables
 ENV PORT=3000
 ENV ADMIN_PORT=3001
+ENV DATA_DIR=/app/data
 
 # Copy startup script
 COPY docker-start.sh ./docker-start.sh

@@ -4,6 +4,15 @@ A dark-themed dashboard for self-hosted services with NPM auto-discovery and PWA
 
 ## Quick Start
 
+### Docker Compose (Recommended)
+
+Create a directory for your configuration:
+```bash
+mkdir -p ~/services-dashboard
+cd ~/services-dashboard
+```
+
+Create `docker-compose.yml`:
 ```yaml
 version: '3.8'
 services:
@@ -14,11 +23,6 @@ services:
       - "3000:3000"  # Dashboard
       - "3001:3001"  # Admin panel
     environment:
-      # NPM auto-discovery (optional)
-      - NPM_API_URL=http://nginx-proxy-manager:81/api
-      - NPM_USERNAME=admin@example.com
-      - NPM_PASSWORD=your-password
-
       # Base domain (optional)
       - BASE_URL=example.com
 
@@ -26,48 +30,58 @@ services:
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=your-password
     volumes:
-      - ./services.json:/app/public/services.json  # Optional manual services
-      - ./config.json:/app/config.json  # Persists admin settings
+      # All configuration stored in ./data directory
+      - ./data:/app/data
     restart: unless-stopped
 ```
 
-Access:
+Start the container:
+```bash
+docker-compose up -d
+```
+
+### Docker Run
+
+```bash
+mkdir -p ~/services-dashboard/data
+
+docker run -d \
+  --name services-dashboard \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -e BASE_URL=example.com \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=your-password \
+  -v ~/services-dashboard/data:/app/data \
+  --restart unless-stopped \
+  b12e/services-dashboard:latest
+```
+
+## Access
+
 - **Dashboard**: http://localhost:3000
 - **Admin Panel**: http://localhost:3001
 
-## Features
+## Configuration
 
-- Auto-discover services from Nginx Proxy Manager
-- Manual service configuration via JSON or admin UI
-- Service categories with auto-detection
-- Icon matching from 2000+ dashboard icons
-- Dark theme with responsive design
-- PWA with offline support
-- Optional authentication with passkey support
+All configuration is stored in the mounted `data` directory:
+- `data/services.json` - Manual services
+- `data/config.json` - NPM connections, base domain, categories
+- `data/auth.json` - Passkey credentials (if auth enabled)
 
-## Admin Panel
+### Using the Admin Panel
 
-Use the web UI on port 3001 to:
-- Add/edit/delete services
-- Configure NPM connections
-- Manage categories and visibility
-- Set up passkey authentication
+1. Access http://localhost:3001
+2. **Services tab**: Add/edit/delete services manually
+3. **Configuration tab**:
+   - Set base domain
+   - Add NPM connections (URL, username, password)
+   - Manage categories
+   - Register passkeys (if auth enabled)
 
-## Environment Variables
+### Manual Configuration
 
-| Variable | Description |
-|----------|-------------|
-| `NPM_API_URL` | NPM API endpoint (e.g., `http://npm:81/api`) |
-| `NPM_USERNAME` | NPM admin email |
-| `NPM_PASSWORD` | NPM password |
-| `BASE_URL` | Base domain for services (e.g., `example.com`) |
-| `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
-| `ADMIN_PASSWORD` | Admin panel password |
-
-## Manual Services
-
-Create `services.json`:
-
+Create `data/services.json`:
 ```json
 {
   "services": [
@@ -85,7 +99,42 @@ Create `services.json`:
 }
 ```
 
-Fields:
+Create `data/config.json`:
+```json
+{
+  "baseUrl": "example.com",
+  "npmEnabled": true,
+  "npmConnections": [
+    {
+      "name": "Main NPM",
+      "url": "http://nginx-proxy-manager:81/api",
+      "token": "your-api-token"
+    }
+  ],
+  "categories": []
+}
+```
+
+## Features
+
+- Auto-discover services from Nginx Proxy Manager
+- Manual service configuration via JSON or admin UI
+- Service categories with auto-detection
+- Icon matching from 2000+ dashboard icons
+- Dark theme with responsive design
+- PWA with offline support
+- Optional authentication with passkey support
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `BASE_URL` | Base domain for services (e.g., `example.com`) |
+| `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
+| `ADMIN_PASSWORD` | Admin panel password |
+
+## Service Fields
+
 - `name` - Display name
 - `url` - Service URL or subdomain
 - `appendBaseDomain` - Add BASE_URL to URL (default: true)
