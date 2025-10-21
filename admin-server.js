@@ -216,7 +216,16 @@ async function loadAuthData() {
 }
 
 async function saveAuthData(data) {
-  await fs.writeFile(AUTH_PATH, JSON.stringify(data, null, 2))
+  // Custom replacer to catch any Uint8Arrays that shouldn't be here
+  const jsonString = JSON.stringify(data, (key, value) => {
+    if (value instanceof Uint8Array) {
+      console.error(`WARNING: Uint8Array found at key "${key}" - converting to Base64URL`)
+      return isoBase64URL.fromBuffer(value)
+    }
+    return value
+  }, 2)
+  console.log('Saving auth data, JSON length:', jsonString.length, 'First 200 chars:', jsonString.substring(0, 200))
+  await fs.writeFile(AUTH_PATH, jsonString, 'utf-8')
 }
 
 // Authentication middleware
