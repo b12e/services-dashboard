@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - beta
     tags:
       - 'v*'
   pull_request:
@@ -51,8 +52,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Always tag as latest on main branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag as 'latest' on main branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # Tag as 'dev' on beta branch
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/beta' }}
             # Tag with auto-generated version
             type=raw,value=${{ steps.version.outputs.version }}
             # If pushing a tag (e.g., v1.2.3), create semver tags
