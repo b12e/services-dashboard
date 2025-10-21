@@ -260,7 +260,6 @@ function App() {
   if (loading) {
     return (
       <div className="container">
-        <h1>Quick Access Dashboard</h1>
         <div className="loading">Loading services...</div>
       </div>
     )

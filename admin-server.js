@@ -134,12 +134,22 @@ if (!SESSION_SECRET) {
   CSRF_SECRET = SESSION_SECRET
 }
 
-// CSRF protection initialized
+console.log('🔐 Initializing CSRF protection with secret length:', CSRF_SECRET.length)
 
 const csrfProtection = doubleCsrf({
   getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
-  getSessionIdentifier: (req) => req.session?.id || req.sessionID || '', // Session identifier for token validation
-  cookieName: process.env.NODE_ENV === 'production' ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
+  getSessionIdentifier: (req) => {
+    // Ensure session is initialized before returning session ID
+    // This forces session creation even with saveUninitialized: false
+    if (req.session && !req.session.csrfInit) {
+      req.session.csrfInit = true
+    }
+    // Return session ID - express-session generates a sessionID even with saveUninitialized: false
+    const sessionId = req.sessionID || 'anonymous'
+    console.log('🔐 getSessionIdentifier called, has sessionID:', !!req.sessionID)
+    return sessionId
+  },
+  cookieName: 'x-csrf-token', // Simplified cookie name
   cookieOptions: {
     httpOnly: true,
     sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
@@ -347,7 +357,9 @@ function requireAuth(req, res, next) {
 
 // Public endpoint to get CSRF token
 app.get('/api/admin/csrf-token', apiRateLimiter, (req, res) => {
+  console.log('🔐 CSRF token requested, has session:', !!req.session)
   const csrfToken = generateToken(req, res)
+  console.log('🔐 CSRF token generated:', csrfToken ? 'success' : 'failed')
   res.json({ csrfToken })
 })
 
@@ -361,7 +373,12 @@ app.get('/api/admin/auth/status', apiRateLimiter, (req, res) => {
 })
 
 // Login with password
-app.post('/api/admin/auth/login', authRateLimiter, doubleCsrfProtection, async (req, res) => {
+app.post('/api/admin/auth/login', authRateLimiter, (req, res, next) => {
+  console.log('🔐 Login attempt, has session:', !!req.session, 'has sessionID:', !!req.sessionID)
+  console.log('🔐 Has CSRF token in header:', !!req.headers['x-csrf-token'])
+  console.log('🔐 Has CSRF cookie:', !!req.cookies['x-csrf-token'])
+  next()
+}, doubleCsrfProtection, async (req, res) => {
   if (!AUTH_REQUIRED) {
     return res.json({ success: true })
   }
