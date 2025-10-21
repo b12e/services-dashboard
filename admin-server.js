@@ -124,17 +124,17 @@ let CSRF_SECRET
 if (!SESSION_SECRET) {
   // Generate a cryptographically secure random secret
   CSRF_SECRET = crypto.randomBytes(32).toString('base64')
-  console.log('🔐 Auto-generated CSRF secret (SESSION_SECRET not set)')
+  // CSRF secret auto-generated as SESSION_SECRET was not set
 } else if (SESSION_SECRET.length < 32) {
   // Pad the secret if it's too short
   CSRF_SECRET = SESSION_SECRET.padEnd(32, SESSION_SECRET)
-  console.warn('⚠️  WARNING: SESSION_SECRET is less than 32 characters. Padding it, but please use a longer secret in production.')
+  // WARNING: SESSION_SECRET is less than 32 characters. It was padded. Consider using a longer secret in production.
 } else {
   // Use the provided secret
   CSRF_SECRET = SESSION_SECRET
 }
 
-console.log('🔐 Initializing CSRF protection with secret length:', CSRF_SECRET.length)
+// CSRF protection initialized
 
 const csrfProtection = doubleCsrf({
   getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
