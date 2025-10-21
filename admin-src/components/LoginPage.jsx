@@ -15,10 +15,13 @@ function LoginPage({ onLogin }) {
 
   async function checkPasskeyAvailability() {
     try {
-      const response = await fetch('/api/admin/auth/passkeys/login/options', {
-        method: 'POST'
-      })
-      setHasPasskeys(response.ok)
+      const response = await fetch('/api/admin/auth/passkeys/available')
+      if (response.ok) {
+        const data = await response.json()
+        setHasPasskeys(data.available)
+      } else {
+        setHasPasskeys(false)
+      }
     } catch {
       setHasPasskeys(false)
     }

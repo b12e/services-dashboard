@@ -245,7 +245,15 @@ app.post('/api/admin/auth/logout', (req, res) => {
   })
 })
 
-// Check if user has passkeys
+// Check if user has passkeys (public endpoint for login page)
+app.get('/api/admin/auth/passkeys/available', async (req, res) => {
+  const authData = await loadAuthData()
+  res.json({
+    available: authData.passkeys && authData.passkeys.length > 0
+  })
+})
+
+// Check if user has passkeys (authenticated endpoint for settings page)
 app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
   const authData = await loadAuthData()
   res.json({
