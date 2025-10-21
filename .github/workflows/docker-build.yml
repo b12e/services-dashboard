@@ -52,12 +52,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Tag as 'latest' on main branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            # Tag as 'dev' on beta branch
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/beta' }}
-            # Tag with auto-generated version
-            type=raw,value=${{ steps.version.outputs.version }}
+            # Tag as 'latest' on main branch push
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            # Tag as 'dev' on PRs to beta branch
+            type=raw,value=dev,enable=${{ github.event_name == 'pull_request' && github.base_ref == 'beta' }}
+            # Tag with auto-generated version on main branch only (not PRs)
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             # If pushing a tag (e.g., v1.2.3), create semver tags
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
