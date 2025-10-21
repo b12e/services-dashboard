@@ -1,0 +1,483 @@
+import express from 'express'
+import session from 'express-session'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const app = express()
+const PORT = 3001
+
+// Authentication configuration from environment variables
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || ''
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''
+const AUTH_REQUIRED = !!(ADMIN_USERNAME && ADMIN_PASSWORD)
+const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-in-production'
+
+// WebAuthn configuration
+const RP_NAME = 'Services Dashboard'
+const RP_ID = process.env.RP_ID || 'localhost'
+const ORIGIN = process.env.ORIGIN || `http://localhost:${PORT}`
+
+// Path to files
+const SERVICES_PATH = path.join(__dirname, 'public', 'services.json')
+const CONFIG_PATH = path.join(__dirname, 'config.json')
+const AUTH_PATH = path.join(__dirname, 'auth.json')
+
+// In-memory storage for challenges (in production, use Redis or similar)
+const challenges = new Map()
+
+app.use(express.json())
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}))
+
+// Serve static files for assets (no auth required for CSS/JS/images)
+app.use('/assets', express.static(path.join(__dirname, 'admin-dist', 'assets')))
+app.use('/icon.svg', express.static(path.join(__dirname, 'public', 'icon.svg')))
+
+// Middleware to ensure files exist
+async function ensureFiles() {
+  try {
+    await fs.access(SERVICES_PATH)
+  } catch {
+    await fs.writeFile(SERVICES_PATH, JSON.stringify({ services: [] }, null, 2))
+  }
+
+  try {
+    await fs.access(CONFIG_PATH)
+  } catch {
+    await fs.writeFile(CONFIG_PATH, JSON.stringify({
+      baseUrl: '',
+      npmEnabled: false,
+      npmConnections: [],
+      categories: []
+    }, null, 2))
+  }
+
+  try {
+    await fs.access(AUTH_PATH)
+  } catch {
+    await fs.writeFile(AUTH_PATH, JSON.stringify({
+      passkeys: []
+    }, null, 2))
+  }
+}
+
+// Load/save auth data
+async function loadAuthData() {
+  try {
+    const data = await fs.readFile(AUTH_PATH, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return { passkeys: [] }
+  }
+}
+
+async function saveAuthData(data) {
+  await fs.writeFile(AUTH_PATH, JSON.stringify(data, null, 2))
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  // Skip if auth is not required
+  if (!AUTH_REQUIRED) {
+    return next()
+  }
+
+  // Check session authentication
+  if (req.session?.authenticated) {
+    return next()
+  }
+
+  // Check basic auth
+  const authHeader = req.headers.authorization
+  if (authHeader?.startsWith('Basic ')) {
+    const base64Credentials = authHeader.split(' ')[1]
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8')
+    const [username, password] = credentials.split(':')
+
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+      req.session.authenticated = true
+      return next()
+    }
+  }
+
+  res.status(401).json({ error: 'Authentication required' })
+}
+
+// Public endpoint to check auth status
+app.get('/api/admin/auth/status', (req, res) => {
+  res.json({
+    authRequired: AUTH_REQUIRED,
+    authenticated: AUTH_REQUIRED ? !!req.session?.authenticated : true,
+    hasPasskeys: false // Will be updated by client
+  })
+})
+
+// Login with password
+app.post('/api/admin/auth/login', async (req, res) => {
+  if (!AUTH_REQUIRED) {
+    return res.json({ success: true })
+  }
+
+  const { username, password } = req.body
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    req.session.authenticated = true
+    res.json({ success: true })
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' })
+  }
+})
+
+// Logout
+app.post('/api/admin/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to logout' })
+    }
+    res.json({ success: true })
+  })
+})
+
+// Check if user has passkeys
+app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
+  const authData = await loadAuthData()
+  res.json({
+    hasPasskeys: authData.passkeys && authData.passkeys.length > 0,
+    count: authData.passkeys?.length || 0
+  })
+})
+
+// Generate registration options for new passkey
+app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, res) => {
+  try {
+    const authData = await loadAuthData()
+
+    const options = await generateRegistrationOptions({
+      rpName: RP_NAME,
+      rpID: RP_ID,
+      userID: 'admin',
+      userName: ADMIN_USERNAME || 'admin',
+      attestationType: 'none',
+      authenticatorSelection: {
+        residentKey: 'preferred',
+        userVerification: 'preferred',
+      },
+      excludeCredentials: authData.passkeys?.map(passkey => ({
+        id: passkey.credentialID,
+        type: 'public-key',
+        transports: passkey.transports,
+      })) || [],
+    })
+
+    challenges.set('admin', options.challenge)
+    res.json(options)
+  } catch (error) {
+    console.error('Error generating registration options:', error)
+    res.status(500).json({ error: 'Failed to generate registration options' })
+  }
+})
+
+// Verify passkey registration
+app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, res) => {
+  try {
+    const { credential, name } = req.body
+    const expectedChallenge = challenges.get('admin')
+
+    if (!expectedChallenge) {
+      return res.status(400).json({ error: 'No challenge found' })
+    }
+
+    const verification = await verifyRegistrationResponse({
+      response: credential,
+      expectedChallenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+    })
+
+    if (verification.verified && verification.registrationInfo) {
+      const authData = await loadAuthData()
+
+      const newPasskey = {
+        credentialID: Array.from(new Uint8Array(verification.registrationInfo.credentialID)),
+        credentialPublicKey: Array.from(new Uint8Array(verification.registrationInfo.credentialPublicKey)),
+        counter: verification.registrationInfo.counter,
+        transports: credential.response.transports || [],
+        name: name || `Passkey ${(authData.passkeys?.length || 0) + 1}`,
+        createdAt: new Date().toISOString()
+      }
+
+      if (!authData.passkeys) {
+        authData.passkeys = []
+      }
+      authData.passkeys.push(newPasskey)
+
+      await saveAuthData(authData)
+      challenges.delete('admin')
+
+      res.json({ verified: true, name: newPasskey.name })
+    } else {
+      res.status(400).json({ error: 'Verification failed' })
+    }
+  } catch (error) {
+    console.error('Error verifying registration:', error)
+    res.status(500).json({ error: 'Failed to verify registration' })
+  }
+})
+
+// Generate authentication options for passkey login
+app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
+  try {
+    const authData = await loadAuthData()
+
+    if (!authData.passkeys || authData.passkeys.length === 0) {
+      return res.status(400).json({ error: 'No passkeys registered' })
+    }
+
+    const options = await generateAuthenticationOptions({
+      rpID: RP_ID,
+      allowCredentials: authData.passkeys.map(passkey => ({
+        id: new Uint8Array(passkey.credentialID),
+        type: 'public-key',
+        transports: passkey.transports,
+      })),
+      userVerification: 'preferred',
+    })
+
+    challenges.set('admin', options.challenge)
+    res.json(options)
+  } catch (error) {
+    console.error('Error generating authentication options:', error)
+    res.status(500).json({ error: 'Failed to generate authentication options' })
+  }
+})
+
+// Verify passkey authentication
+app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
+  try {
+    const { credential } = req.body
+    const expectedChallenge = challenges.get('admin')
+
+    if (!expectedChallenge) {
+      return res.status(400).json({ error: 'No challenge found' })
+    }
+
+    const authData = await loadAuthData()
+    const passkey = authData.passkeys?.find(p =>
+      Buffer.from(p.credentialID).toString('base64') ===
+      Buffer.from(credential.rawId, 'base64').toString('base64')
+    )
+
+    if (!passkey) {
+      return res.status(400).json({ error: 'Passkey not found' })
+    }
+
+    const verification = await verifyAuthenticationResponse({
+      response: credential,
+      expectedChallenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      authenticator: {
+        credentialID: new Uint8Array(passkey.credentialID),
+        credentialPublicKey: new Uint8Array(passkey.credentialPublicKey),
+        counter: passkey.counter,
+      },
+    })
+
+    if (verification.verified) {
+      // Update counter
+      passkey.counter = verification.authenticationInfo.newCounter
+      await saveAuthData(authData)
+
+      // Set session
+      req.session.authenticated = true
+      challenges.delete('admin')
+
+      res.json({ verified: true })
+    } else {
+      res.status(400).json({ error: 'Verification failed' })
+    }
+  } catch (error) {
+    console.error('Error verifying authentication:', error)
+    res.status(500).json({ error: 'Failed to verify authentication' })
+  }
+})
+
+// List passkeys
+app.get('/api/admin/auth/passkeys', requireAuth, async (req, res) => {
+  try {
+    const authData = await loadAuthData()
+    const passkeys = (authData.passkeys || []).map(p => ({
+      name: p.name,
+      createdAt: p.createdAt
+    }))
+    res.json(passkeys)
+  } catch (error) {
+    console.error('Error listing passkeys:', error)
+    res.status(500).json({ error: 'Failed to list passkeys' })
+  }
+})
+
+// Delete passkey
+app.delete('/api/admin/auth/passkeys/:index', requireAuth, async (req, res) => {
+  try {
+    const index = parseInt(req.params.index)
+    const authData = await loadAuthData()
+
+    if (!authData.passkeys || index < 0 || index >= authData.passkeys.length) {
+      return res.status(404).json({ error: 'Passkey not found' })
+    }
+
+    authData.passkeys.splice(index, 1)
+    await saveAuthData(authData)
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting passkey:', error)
+    res.status(500).json({ error: 'Failed to delete passkey' })
+  }
+})
+
+// GET /api/admin/services - Get all services
+app.get('/api/admin/services', requireAuth, async (req, res) => {
+  try {
+    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
+    const json = JSON.parse(data)
+    res.json(json.services || [])
+  } catch (error) {
+    console.error('Error reading services:', error)
+    res.status(500).json({ error: 'Failed to read services' })
+  }
+})
+
+// POST /api/admin/services - Add a new service
+app.post('/api/admin/services', requireAuth, async (req, res) => {
+  try {
+    const newService = req.body
+    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
+    const json = JSON.parse(data)
+
+    if (!json.services) {
+      json.services = []
+    }
+
+    json.services.push(newService)
+    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
+
+    res.json(newService)
+  } catch (error) {
+    console.error('Error adding service:', error)
+    res.status(500).json({ error: 'Failed to add service' })
+  }
+})
+
+// PUT /api/admin/services/:index - Update a service
+app.put('/api/admin/services/:index', requireAuth, async (req, res) => {
+  try {
+    const index = parseInt(req.params.index)
+    const updatedService = req.body
+
+    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
+    const json = JSON.parse(data)
+
+    if (!json.services || index < 0 || index >= json.services.length) {
+      return res.status(404).json({ error: 'Service not found' })
+    }
+
+    json.services[index] = updatedService
+    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
+
+    res.json(updatedService)
+  } catch (error) {
+    console.error('Error updating service:', error)
+    res.status(500).json({ error: 'Failed to update service' })
+  }
+})
+
+// DELETE /api/admin/services/:index - Delete a service
+app.delete('/api/admin/services/:index', requireAuth, async (req, res) => {
+  try {
+    const index = parseInt(req.params.index)
+
+    const data = await fs.readFile(SERVICES_PATH, 'utf-8')
+    const json = JSON.parse(data)
+
+    if (!json.services || index < 0 || index >= json.services.length) {
+      return res.status(404).json({ error: 'Service not found' })
+    }
+
+    json.services.splice(index, 1)
+    await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting service:', error)
+    res.status(500).json({ error: 'Failed to delete service' })
+  }
+})
+
+// GET /api/admin/config - Get configuration
+app.get('/api/admin/config', requireAuth, async (req, res) => {
+  try {
+    const data = await fs.readFile(CONFIG_PATH, 'utf-8')
+    const config = JSON.parse(data)
+    res.json(config)
+  } catch (error) {
+    console.error('Error reading config:', error)
+    res.status(500).json({ error: 'Failed to read configuration' })
+  }
+})
+
+// PUT /api/admin/config - Update configuration
+app.put('/api/admin/config', requireAuth, async (req, res) => {
+  try {
+    const config = req.body
+    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+    res.json(config)
+  } catch (error) {
+    console.error('Error updating config:', error)
+    res.status(500).json({ error: 'Failed to update configuration' })
+  }
+})
+
+// Serve admin UI for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-dist', 'index.html'))
+})
+
+// Start server
+async function start() {
+  await ensureFiles()
+  app.listen(PORT, () => {
+    console.log(`
+===========================================
+Management Tool Server Started
+===========================================
+URL: ${ORIGIN}
+Authentication: ${AUTH_REQUIRED ? 'ENABLED' : 'DISABLED'}
+${AUTH_REQUIRED ? `Username: ${ADMIN_USERNAME}` : ''}
+${AUTH_REQUIRED ? `Password: ${ADMIN_PASSWORD}` : ''}
+WebAuthn RP ID: ${RP_ID}
+===========================================
+    `)
+  })
+}
+
+start().catch(console.error)

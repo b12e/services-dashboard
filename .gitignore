@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+admin-dist/
 
 # Environment variables
 .env
@@ -38,3 +39,5 @@ lerna-debug.log*
 # Local configuration (optional - remove if you want to commit these)
 services.json
 configuration.json
+config.json
+auth.json
