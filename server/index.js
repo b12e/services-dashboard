@@ -281,11 +281,22 @@ app.get('/api/npm/services', async (req, res) => {
       try {
         console.log(`Fetching from NPM: ${connection.name || connection.url}`)
 
-        // Authenticate with NPM using token directly (no username/password)
-        const token = connection.token
+        // Authenticate with NPM - get token from username/password
+        let token
+        const apiUrl = connection.url.replace(/\/api$/, '') + '/api'
+
+        if (connection.username && connection.password) {
+          // Get token via authentication
+          token = await authenticateNPM(apiUrl, connection.username, connection.password)
+        } else if (connection.token) {
+          // Use token directly (backward compatibility)
+          token = connection.token
+        } else {
+          throw new Error('No credentials provided (need username/password or token)')
+        }
 
         // Fetch proxy hosts
-        const proxyHosts = await fetchProxyHosts(connection.url, token)
+        const proxyHosts = await fetchProxyHosts(apiUrl, token)
         console.log(`Found ${proxyHosts.length} proxy hosts from ${connection.name || connection.url}`)
 
         // Filter only enabled hosts

@@ -59,7 +59,8 @@ function ConfigManager() {
         ...prev.npmConnections,
         {
           url: '',
-          token: '',
+          username: '',
+          password: '',
           name: ''
         }
       ]
@@ -161,17 +162,27 @@ function ConfigManager() {
                       type="text"
                       value={conn.url}
                       onChange={(e) => updateNpmConnection(index, 'url', e.target.value)}
-                      placeholder="https://npm.example.com"
+                      placeholder="http://nginx-proxy-manager:81"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>API Token</label>
+                    <label>Username (Email)</label>
+                    <input
+                      type="text"
+                      value={conn.username || ''}
+                      onChange={(e) => updateNpmConnection(index, 'username', e.target.value)}
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Password</label>
                     <input
                       type="password"
-                      value={conn.token}
-                      onChange={(e) => updateNpmConnection(index, 'token', e.target.value)}
-                      placeholder="Your NPM API token"
+                      value={conn.password || ''}
+                      onChange={(e) => updateNpmConnection(index, 'password', e.target.value)}
+                      placeholder="Your NPM password"
                     />
                   </div>
 

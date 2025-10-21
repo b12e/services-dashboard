@@ -107,8 +107,9 @@ Create `data/config.json`:
   "npmConnections": [
     {
       "name": "Main NPM",
-      "url": "http://nginx-proxy-manager:81/api",
-      "token": "your-api-token"
+      "url": "http://nginx-proxy-manager:81",
+      "username": "admin@example.com",
+      "password": "your-password"
     }
   ],
   "categories": []
