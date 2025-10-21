@@ -3,6 +3,7 @@ import session from 'express-session'
 import cookieParser from 'cookie-parser'
 import { doubleCsrf } from 'csrf-csrf'
 import rateLimit from 'express-rate-limit'
+import crypto from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -117,13 +118,23 @@ app.use(session({
 
 // Configure CSRF protection
 // The csrf-csrf library requires the secret to be at least 32 characters
-const CSRF_SECRET = SESSION_SECRET.length >= 32
-  ? SESSION_SECRET
-  : SESSION_SECRET.padEnd(32, SESSION_SECRET)
+// Auto-generate a secure random secret if SESSION_SECRET is not set or too short
+let CSRF_SECRET
 
-if (SESSION_SECRET.length < 32) {
-  console.warn('⚠️  WARNING: SESSION_SECRET is less than 32 characters. Please use a longer secret in production.')
+if (!SESSION_SECRET) {
+  // Generate a cryptographically secure random secret
+  CSRF_SECRET = crypto.randomBytes(32).toString('base64')
+  console.log('🔐 Auto-generated CSRF secret (SESSION_SECRET not set)')
+} else if (SESSION_SECRET.length < 32) {
+  // Pad the secret if it's too short
+  CSRF_SECRET = SESSION_SECRET.padEnd(32, SESSION_SECRET)
+  console.warn('⚠️  WARNING: SESSION_SECRET is less than 32 characters. Padding it, but please use a longer secret in production.')
+} else {
+  // Use the provided secret
+  CSRF_SECRET = SESSION_SECRET
 }
+
+console.log('🔐 Initializing CSRF protection with secret length:', CSRF_SECRET.length)
 
 const {
   generateToken, // Use this to create a CSRF token
