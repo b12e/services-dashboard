@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { formatCategoryName } from '../utils/formatCategory'
 
-function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose }) {
+function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose, customName, customIcon }) {
   const sidebarRef = useRef(null)
 
   const handleCategoryClick = (category) => {
@@ -41,8 +41,8 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
       <aside ref={sidebarRef} className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-content">
         <div className="sidebar-header">
-          <img src="/icon.svg" alt="Logo" className="sidebar-logo" />
-          <h1 className="sidebar-brand">Quick Access</h1>
+          <img src={customIcon || "/icon.svg"} alt="Logo" className="sidebar-logo" />
+          <h1 className="sidebar-brand">{customName || 'Quick Access'}</h1>
         </div>
         <h2 className="sidebar-title">Categories</h2>
         <nav className="sidebar-nav">
@@ -81,7 +81,9 @@ Sidebar.propTypes = {
   selectedCategory: PropTypes.string.isRequired,
   onCategorySelect: PropTypes.func.isRequired,
   isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func
+  onClose: PropTypes.func,
+  customName: PropTypes.string,
+  customIcon: PropTypes.string
 }
 
 export default Sidebar

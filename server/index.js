@@ -24,6 +24,10 @@ app.use(express.json())
 // Data directory for configuration
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '../data')
 const CONFIG_PATH = join(DATA_DIR, 'config.json')
+const UPLOADS_DIR = join(DATA_DIR, 'uploads')
+
+// Serve uploaded files (custom icons)
+app.use('/uploads', express.static(UPLOADS_DIR))
 
 // Load NPM configuration from config.json
 let NPM_CONFIG = {
@@ -351,6 +355,22 @@ app.get('/api/config', async (req, res) => {
   } catch (error) {
     console.error('Failed to get config:', error)
     res.status(500).json({ error: 'Failed to get config' })
+  }
+})
+
+// API endpoint to get custom branding
+app.get('/api/branding', async (req, res) => {
+  try {
+    const config = await loadConfig()
+    res.json({
+      customName: config.customName || 'Services Dashboard',
+      customIcon: config.customIcon || null
+    })
+  } catch (error) {
+    res.json({
+      customName: 'Services Dashboard',
+      customIcon: null
+    })
   }
 })
 

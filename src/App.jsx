@@ -18,12 +18,33 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [customName, setCustomName] = useState('Services Dashboard')
+  const [customIcon, setCustomIcon] = useState(null)
 
   // Preload icons metadata on app start
   useEffect(() => {
     preloadIconsMetadata().catch(() => {
       // Silently fail - icons will fall back to initials
     })
+  }, [])
+
+  // Load branding from API
+  useEffect(() => {
+    async function loadBranding() {
+      try {
+        const response = await fetch('/api/branding')
+        if (response.ok) {
+          const branding = await response.json()
+          setCustomName(branding.customName || 'Services Dashboard')
+          setCustomIcon(branding.customIcon)
+          // Update page title
+          document.title = branding.customName || 'Services Dashboard'
+        }
+      } catch (error) {
+        // Silently fail - will use defaults
+      }
+    }
+    loadBranding()
   }, [])
 
   // Load configuration from API
@@ -267,6 +288,8 @@ function App() {
         onCategorySelect={handleCategorySelect}
         isOpen={isMobileMenuOpen}
         onClose={handleMenuClose}
+        customName={customName}
+        customIcon={customIcon}
       />
       <div className="main-content">
         <div className="container">

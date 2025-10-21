@@ -4,11 +4,14 @@ function ConfigManager() {
   const [config, setConfig] = useState({
     baseUrl: '',
     npmEnabled: false,
-    npmConnections: []
+    npmConnections: [],
+    customName: 'Services Dashboard',
+    customIcon: null
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [validationResults, setValidationResults] = useState([])
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -96,6 +99,40 @@ function ConfigManager() {
     }))
   }
 
+  async function handleIconUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('icon', file)
+
+      const response = await fetch('/api/admin/upload/icon', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setConfig(prev => ({ ...prev, customIcon: result.iconPath }))
+        alert('Icon uploaded successfully!')
+      } else {
+        const error = await response.json()
+        alert(`Failed to upload icon: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to upload icon:', error)
+      alert('Failed to upload icon')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function removeCustomIcon() {
+    setConfig(prev => ({ ...prev, customIcon: null }))
+  }
+
   if (loading) {
     return <div className="loading">Loading configuration...</div>
   }
@@ -111,6 +148,62 @@ function ConfigManager() {
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>
+      </div>
+
+      <div className="config-section">
+        <h3>Branding</h3>
+        <div className="form-group">
+          <label>Dashboard Name</label>
+          <input
+            type="text"
+            value={config.customName || 'Services Dashboard'}
+            onChange={(e) => updateConfig('customName', e.target.value)}
+            placeholder="Services Dashboard"
+          />
+          <p className="help-text">
+            Custom name for your dashboard (used in page title and header)
+          </p>
+        </div>
+
+        <div className="form-group">
+          <label>Custom Icon</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {config.customIcon && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <img
+                  src={config.customIcon}
+                  alt="Custom icon"
+                  style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+                />
+                <button
+                  onClick={removeCustomIcon}
+                  className="btn-danger btn-small"
+                  type="button"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {!config.customIcon && (
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleIconUpload}
+                  disabled={uploading}
+                  id="icon-upload"
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="icon-upload" className="btn-small" style={{ cursor: 'pointer', display: 'inline-block' }}>
+                  {uploading ? 'Uploading...' : 'Upload Icon'}
+                </label>
+              </div>
+            )}
+          </div>
+          <p className="help-text">
+            Upload a custom icon for your dashboard (max 2MB, image files only)
+          </p>
+        </div>
       </div>
 
       <div className="config-section">

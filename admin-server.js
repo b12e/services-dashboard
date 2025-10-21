@@ -3,12 +3,14 @@ import session from 'express-session'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import multer from 'multer'
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server'
+import { isoBase64URL } from '@simplewebauthn/server/helpers'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -60,6 +62,39 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
 const SERVICES_PATH = path.join(DATA_DIR, 'services.json')
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json')
 const AUTH_PATH = path.join(DATA_DIR, 'auth.json')
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    try {
+      await fs.mkdir(UPLOADS_DIR, { recursive: true })
+      cb(null, UPLOADS_DIR)
+    } catch (error) {
+      cb(error, null)
+    }
+  },
+  filename: (req, file, cb) => {
+    // Keep the original extension but use a fixed name for the custom icon
+    const ext = path.extname(file.originalname)
+    cb(null, `custom-icon${ext}`)
+  }
+})
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024 // 2MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only images
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only image files are allowed'))
+    }
+  }
+})
 
 // In-memory storage for challenges (in production, use Redis or similar)
 const challenges = new Map()
@@ -155,7 +190,9 @@ async function ensureFiles() {
       baseUrl: '',
       npmEnabled: false,
       npmConnections: [],
-      categories: []
+      categories: [],
+      customName: 'Services Dashboard',
+      customIcon: null
     }, null, 2))
   }
 
@@ -331,9 +368,10 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
     if (verification.verified && verification.registrationInfo) {
       const authData = await loadAuthData()
 
+      // Store credentialID and publicKey as Base64URL strings for compatibility
       const newPasskey = {
-        credentialID: Array.from(new Uint8Array(verification.registrationInfo.credentialID)),
-        credentialPublicKey: Array.from(new Uint8Array(verification.registrationInfo.credentialPublicKey)),
+        credentialID: isoBase64URL.fromBuffer(verification.registrationInfo.credentialID),
+        credentialPublicKey: isoBase64URL.fromBuffer(verification.registrationInfo.credentialPublicKey),
         counter: verification.registrationInfo.counter,
         transports: credential.response.transports || [],
         name: name || `Passkey ${(authData.passkeys?.length || 0) + 1}`,
@@ -371,7 +409,7 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
     const options = await generateAuthenticationOptions({
       rpID: rpID,
       allowCredentials: authData.passkeys.map(passkey => ({
-        id: new Uint8Array(passkey.credentialID),
+        id: isoBase64URL.toBuffer(passkey.credentialID),
         type: 'public-key',
         transports: passkey.transports,
       })),
@@ -399,8 +437,7 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
 
     const authData = await loadAuthData()
     const passkey = authData.passkeys?.find(p =>
-      Buffer.from(p.credentialID).toString('base64') ===
-      Buffer.from(credential.rawId, 'base64').toString('base64')
+      p.credentialID === isoBase64URL.fromBuffer(new Uint8Array(credential.rawId))
     )
 
     if (!passkey) {
@@ -413,8 +450,8 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        credentialID: new Uint8Array(passkey.credentialID),
-        credentialPublicKey: new Uint8Array(passkey.credentialPublicKey),
+        credentialID: isoBase64URL.toBuffer(passkey.credentialID),
+        credentialPublicKey: isoBase64URL.toBuffer(passkey.credentialPublicKey),
         counter: passkey.counter,
       },
     })
@@ -705,6 +742,23 @@ app.get('/api/admin/categories', requireAuth, async (req, res) => {
   }
 })
 
+// GET /api/branding - Get custom name and icon (public endpoint)
+app.get('/api/branding', async (req, res) => {
+  try {
+    const data = await fs.readFile(CONFIG_PATH, 'utf-8')
+    const config = JSON.parse(data)
+    res.json({
+      customName: config.customName || 'Services Dashboard',
+      customIcon: config.customIcon || null
+    })
+  } catch (error) {
+    res.json({
+      customName: 'Services Dashboard',
+      customIcon: null
+    })
+  }
+})
+
 // GET /api/admin/config - Get configuration
 app.get('/api/admin/config', requireAuth, async (req, res) => {
   try {
@@ -764,6 +818,28 @@ app.put('/api/admin/config', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to update configuration' })
   }
 })
+
+// Upload custom icon
+app.post('/api/admin/upload/icon', requireAuth, upload.single('icon'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    const iconPath = `/uploads/${req.file.filename}`
+    res.json({
+      success: true,
+      iconPath,
+      message: 'Icon uploaded successfully'
+    })
+  } catch (error) {
+    console.error('Error uploading icon:', error)
+    res.status(500).json({ error: 'Failed to upload icon' })
+  }
+})
+
+// Serve uploaded files
+app.use('/uploads', express.static(UPLOADS_DIR))
 
 // Serve admin UI for all other routes
 app.get('*', (req, res) => {

@@ -263,16 +263,32 @@ function ServicesManager() {
                       />
                     )}
                   </td>
-                  <td className="name-cell">
-                    <div className="name-badges">
-                      {service.name}
-                      {service._source === 'npm' && <span className="badge-npm">NPM</span>}
-                      {service._hasOverrides && <span className="badge-override">Customized</span>}
-                    </div>
-                  </td>
+                  <td className="name-cell">{service.name}</td>
                   <td className="description-cell">{service.description || '-'}</td>
                   <td className="url-cell">{service.url}</td>
-                  <td className="source-cell">{service._source === 'npm' ? 'NPM' : 'Manual'}</td>
+                  <td className="source-cell">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {service._source === 'npm' ? (
+                        <>
+                          <span className="badge-npm">NPM</span>
+                          {service._hasOverrides && (
+                            <>
+                              <span className="badge-override">Customized</span>
+                              <button
+                                onClick={() => handleDelete(service._id, service._source)}
+                                className="btn-small btn-reset"
+                                title="Reset to NPM defaults"
+                              >
+                                Reset
+                              </button>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <span className="badge-manual">Manual</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="categories-cell">
                     {service.categories && service.categories.length > 0
                       ? service.categories.join(', ')
@@ -285,9 +301,11 @@ function ServicesManager() {
                     <button onClick={() => startEdit(service._id, service)} className="btn-small btn-edit">
                       {service._source === 'npm' ? 'Customize' : 'Edit'}
                     </button>
-                    <button onClick={() => handleDelete(service._id, service._source)} className="btn-small btn-danger">
-                      {service._source === 'npm' ? 'Reset' : 'Delete'}
-                    </button>
+                    {service._source === 'manual' && (
+                      <button onClick={() => handleDelete(service._id, service._source)} className="btn-small btn-danger">
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

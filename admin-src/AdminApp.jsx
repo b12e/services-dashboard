@@ -12,10 +12,28 @@ function AdminApp() {
     authenticated: false,
     loading: true
   })
+  const [customName, setCustomName] = useState('Services Dashboard')
+  const [customIcon, setCustomIcon] = useState(null)
 
   useEffect(() => {
     checkAuthStatus()
+    loadBranding()
   }, [])
+
+  async function loadBranding() {
+    try {
+      const response = await fetch('/api/branding')
+      if (response.ok) {
+        const branding = await response.json()
+        setCustomName(branding.customName || 'Services Dashboard')
+        setCustomIcon(branding.customIcon)
+        // Update page title
+        document.title = `${branding.customName || 'Services Dashboard'} - Management`
+      }
+    } catch (error) {
+      // Silently fail - will use defaults
+    }
+  }
 
   async function checkAuthStatus() {
     try {
@@ -63,8 +81,8 @@ function AdminApp() {
     <div className="admin-app">
       <header className="admin-header">
         <div className="header-title">
-          <img src="/icon.svg" alt="Logo" className="header-logo" />
-          <h1>Services Dashboard Management</h1>
+          <img src={customIcon || "/icon.svg"} alt="Logo" className="header-logo" />
+          <h1>{customName} Management</h1>
         </div>
         <nav className="admin-nav">
           <button
