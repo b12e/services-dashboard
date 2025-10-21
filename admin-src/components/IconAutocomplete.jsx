@@ -1,31 +1,37 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Helper function to validate and sanitize icon names
-// Only allows alphanumeric characters, hyphens, underscores, and dots
-function sanitizeIconName(iconName) {
-  if (!iconName || typeof iconName !== 'string') {
-    return ''
-  }
+// Simple component to display icon preview
+function IconPreview({ iconName }) {
+  const [iconUrl, setIconUrl] = useState(null)
 
-  // Remove any characters that are not alphanumeric, dash, underscore, or dot
-  const sanitized = iconName.replace(/[^a-zA-Z0-9\-_.]/g, '')
+  useEffect(() => {
+    if (!iconName) return
 
-  // Prevent path traversal attacks
-  if (sanitized.includes('..') || sanitized.includes('./') || sanitized.includes('/.')) {
-    return ''
-  }
+    async function loadPreview() {
+      try {
+        const response = await fetch(`/api/icons/preview/${encodeURIComponent(iconName)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setIconUrl(data.url)
+        }
+      } catch (error) {
+        console.error('Failed to load icon preview:', error)
+      }
+    }
 
-  return sanitized
-}
+    loadPreview()
+  }, [iconName])
 
-// Helper function to check if icon name is valid against the loaded icons list
-function isValidIconName(iconName, iconsList) {
-  if (!iconName || !iconsList || iconsList.length === 0) {
-    return false
-  }
+  if (!iconUrl) return null
 
-  const sanitized = sanitizeIconName(iconName)
-  return iconsList.some(icon => icon.name === sanitized)
+  return (
+    <img
+      src={iconUrl}
+      alt={iconName}
+      className="icon-suggestion-preview"
+      onError={(e) => e.target.style.display = 'none'}
+    />
+  )
 }
 
 function IconAutocomplete({ value, onChange, placeholder }) {
