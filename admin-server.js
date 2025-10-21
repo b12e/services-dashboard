@@ -1,5 +1,8 @@
 import express from 'express'
 import session from 'express-session'
+import cookieParser from 'cookie-parser'
+import { doubleCsrf } from 'csrf-csrf'
+import rateLimit from 'express-rate-limit'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -100,6 +103,7 @@ const upload = multer({
 const challenges = new Map()
 
 app.use(express.json())
+app.use(cookieParser())
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
@@ -110,6 +114,40 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }))
+
+// Configure CSRF protection
+const {
+  generateToken, // Use this to create a CSRF token
+  doubleCsrfProtection, // This is the middleware
+} = doubleCsrf({
+  getSecret: () => SESSION_SECRET, // Use the same secret as sessions
+  cookieName: '__Host-psifi.x-csrf-token',
+  cookieOptions: {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  },
+  size: 64,
+  ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
+  getTokenFromRequest: (req) => req.headers['x-csrf-token'], // Read token from header
+})
+
+// Configure rate limiting for authentication endpoints
+const authRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 10, // Limit each IP to 10 requests per windowMs
+  message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Use a custom key generator to handle proxies correctly
+  keyGenerator: (req) => {
+    // Get the real IP address from headers (for reverse proxy support)
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+           req.headers['x-real-ip'] ||
+           req.ip
+  },
+})
 
 // NPM authentication utility
 async function authenticateNPM(apiUrl, username, password) {
@@ -224,7 +262,7 @@ async function saveAuthData(data) {
     }
     return value
   }, 2)
-  console.log('Saving auth data, JSON length:', jsonString.length, 'First 200 chars:', jsonString.substring(0, 200))
+  console.log('Saving auth data, JSON length:', jsonString.length)
   await fs.writeFile(AUTH_PATH, jsonString, 'utf-8')
 }
 
@@ -256,6 +294,12 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Authentication required' })
 }
 
+// Public endpoint to get CSRF token
+app.get('/api/admin/csrf-token', (req, res) => {
+  const csrfToken = generateToken(req, res)
+  res.json({ csrfToken })
+})
+
 // Public endpoint to check auth status
 app.get('/api/admin/auth/status', (req, res) => {
   res.json({
@@ -266,7 +310,7 @@ app.get('/api/admin/auth/status', (req, res) => {
 })
 
 // Login with password
-app.post('/api/admin/auth/login', async (req, res) => {
+app.post('/api/admin/auth/login', authRateLimiter, doubleCsrfProtection, async (req, res) => {
   if (!AUTH_REQUIRED) {
     return res.json({ success: true })
   }
@@ -282,7 +326,7 @@ app.post('/api/admin/auth/login', async (req, res) => {
 })
 
 // Logout
-app.post('/api/admin/auth/logout', (req, res) => {
+app.post('/api/admin/auth/logout', doubleCsrfProtection, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to logout' })
@@ -292,7 +336,7 @@ app.post('/api/admin/auth/logout', (req, res) => {
 })
 
 // Check if user has passkeys (public endpoint for login page)
-app.get('/api/admin/auth/passkeys/available', async (req, res) => {
+app.get('/api/admin/auth/passkeys/available', authRateLimiter, async (req, res) => {
   const authData = await loadAuthData()
   res.json({
     available: authData.passkeys && authData.passkeys.length > 0
@@ -309,7 +353,7 @@ app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
 })
 
 // Generate registration options for new passkey
-app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, res) => {
+app.post('/api/admin/auth/passkeys/register/options', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
 
@@ -357,7 +401,7 @@ app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, r
 })
 
 // Verify passkey registration
-app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, res) => {
+app.post('/api/admin/auth/passkeys/register/verify', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
     const { credential, name } = req.body
@@ -384,17 +428,13 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
       const counter = credInfo.counter
       const transports = credInfo.transports || []
 
-      console.log('credentialID:', credentialID, 'type:', typeof credentialID)
-      console.log('credentialPublicKey type:', typeof credentialPublicKey, 'isUint8Array:', credentialPublicKey instanceof Uint8Array)
+      console.log('Passkey registration successful - storing credential')
 
       // Convert to Base64URL strings
       const credentialIDBase64 = credentialID // Already a Base64URL string
       const publicKeyBase64 = credentialPublicKey instanceof Uint8Array
         ? isoBase64URL.fromBuffer(credentialPublicKey)
         : credentialPublicKey
-
-      console.log('Storing - credentialIDBase64:', credentialIDBase64)
-      console.log('Storing - publicKeyBase64 length:', publicKeyBase64.length)
 
       const newPasskey = {
         credentialID: credentialIDBase64,
@@ -424,7 +464,7 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
 })
 
 // Generate authentication options for passkey login
-app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
+app.post('/api/admin/auth/passkeys/login/options', authRateLimiter, doubleCsrfProtection, async (req, res) => {
   try {
     const { rpID } = getWebAuthnConfig(req)
     const authData = await loadAuthData()
@@ -452,7 +492,7 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
 })
 
 // Verify passkey authentication
-app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
+app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, doubleCsrfProtection, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
     const { credential } = req.body
@@ -464,39 +504,26 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
 
     const authData = await loadAuthData()
 
-    console.log('Login attempt - credential.rawId:', credential.rawId, 'type:', typeof credential.rawId)
-    console.log('Login attempt - credential.id:', credential.id, 'type:', typeof credential.id)
-    console.log('Login attempt - credential.response:', credential.response)
-    console.log('Login attempt - credential.type:', credential.type)
-    console.log('Stored passkeys:', authData.passkeys?.map(p => ({ id: p.credentialID, name: p.name })))
+    console.log('Passkey authentication attempt')
 
     // credential.id is already a Base64URL string, use it directly
     const credentialIDString = credential.id
     const passkey = authData.passkeys?.find(p => p.credentialID === credentialIDString)
 
-    console.log('Searching for credentialID:', credentialIDString)
     console.log('Passkey found:', !!passkey)
 
     if (!passkey) {
       return res.status(400).json({ error: 'Passkey not found' })
     }
 
-    // In @simplewebauthn/server v13+, credentialID and credentialPublicKey should be Base64URL strings
-    console.log('Passkey counter:', passkey.counter)
-
+    // Convert stored Base64URL strings back to Uint8Arrays for verification
     const authenticator = {
-      credentialID: passkey.credentialID, // Keep as Base64URL string
-      credentialPublicKey: passkey.credentialPublicKey, // Keep as Base64URL string
+      credentialID: isoBase64URL.toBuffer(passkey.credentialID),
+      credentialPublicKey: isoBase64URL.toBuffer(passkey.credentialPublicKey),
       counter: passkey.counter,
     }
 
-    console.log('Authenticator object (Base64URL strings):', {
-      credentialID: authenticator.credentialID,
-      credentialPublicKeyLength: authenticator.credentialPublicKey?.length || 0,
-      counter: authenticator.counter,
-      hasTransports: !!passkey.transports,
-      transports: passkey.transports
-    })
+    console.log('Verifying passkey authentication...')
 
     const verification = await verifyAuthenticationResponse({
       response: credential,
@@ -505,6 +532,8 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       expectedRPID: rpID,
       authenticator: authenticator,
     })
+
+    console.log('Verification result:', verification.verified)
 
     if (verification.verified) {
       // Update counter
@@ -541,7 +570,7 @@ app.get('/api/admin/auth/passkeys', requireAuth, async (req, res) => {
 })
 
 // Delete passkey
-app.delete('/api/admin/auth/passkeys/:index', requireAuth, async (req, res) => {
+app.delete('/api/admin/auth/passkeys/:index', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const index = parseInt(req.params.index)
     const authData = await loadAuthData()
@@ -643,7 +672,7 @@ app.get('/api/admin/services', requireAuth, async (req, res) => {
 })
 
 // POST /api/admin/services - Add a new manual service
-app.post('/api/admin/services', requireAuth, async (req, res) => {
+app.post('/api/admin/services', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const newService = req.body
     const { manualServices, overrides } = await loadServicesData()
@@ -663,7 +692,7 @@ app.post('/api/admin/services', requireAuth, async (req, res) => {
 })
 
 // PUT /api/admin/services/:id - Update a service or create/update override
-app.put('/api/admin/services/:id', requireAuth, async (req, res) => {
+app.put('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const serviceId = req.params.id
     const updatedData = req.body
@@ -700,7 +729,7 @@ app.put('/api/admin/services/:id', requireAuth, async (req, res) => {
 })
 
 // DELETE /api/admin/services/:id - Delete a service or remove override
-app.delete('/api/admin/services/:id', requireAuth, async (req, res) => {
+app.delete('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const serviceId = req.params.id
     const { manualServices, overrides } = await loadServicesData()
@@ -822,7 +851,7 @@ app.get('/api/admin/config', requireAuth, async (req, res) => {
 })
 
 // PUT /api/admin/config - Update configuration
-app.put('/api/admin/config', requireAuth, async (req, res) => {
+app.put('/api/admin/config', doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const config = req.body
 
@@ -870,7 +899,7 @@ app.put('/api/admin/config', requireAuth, async (req, res) => {
 })
 
 // Upload custom icon
-app.post('/api/admin/upload/icon', requireAuth, upload.single('icon'), async (req, res) => {
+app.post('/api/admin/upload/icon', doubleCsrfProtection, requireAuth, upload.single('icon'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' })
@@ -906,7 +935,6 @@ Management Tool Server Started
 ===========================================
 Port: ${PORT}
 Authentication: ${AUTH_REQUIRED ? 'ENABLED' : 'DISABLED'}
-${AUTH_REQUIRED ? `Username: ${ADMIN_USERNAME}` : ''}
 WebAuthn: Dynamic host detection enabled
   (RP_ID and Origin detected from request headers)
 ===========================================

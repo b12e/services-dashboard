@@ -1,5 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 
+// Helper function to validate and sanitize icon names
+// Only allows alphanumeric characters, hyphens, underscores, and dots
+function sanitizeIconName(iconName) {
+  if (!iconName || typeof iconName !== 'string') {
+    return ''
+  }
+
+  // Remove any characters that are not alphanumeric, dash, underscore, or dot
+  const sanitized = iconName.replace(/[^a-zA-Z0-9\-_.]/g, '')
+
+  // Prevent path traversal attacks
+  if (sanitized.includes('..') || sanitized.includes('./') || sanitized.includes('/.')) {
+    return ''
+  }
+
+  return sanitized
+}
+
+// Helper function to check if icon name is valid against the loaded icons list
+function isValidIconName(iconName, iconsList) {
+  if (!iconName || !iconsList || iconsList.length === 0) {
+    return false
+  }
+
+  const sanitized = sanitizeIconName(iconName)
+  return iconsList.some(icon => icon.name === sanitized)
+}
+
 function IconAutocomplete({ value, onChange, placeholder }) {
   const [icons, setIcons] = useState([])
   const [inputValue, setInputValue] = useState(value || '')
@@ -30,7 +58,8 @@ function IconAutocomplete({ value, onChange, placeholder }) {
 
   async function loadIcons() {
     try {
-      const response = await fetch('http://localhost:3000/api/icons')
+      // Use relative URL to avoid hardcoded localhost (prevents SSRF)
+      const response = await fetch('/api/icons')
       if (response.ok) {
         const data = await response.json()
         setIcons(data)
@@ -94,12 +123,16 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     }
   }
 
+  // Sanitize and validate the icon name before rendering
+  const sanitizedInputValue = sanitizeIconName(inputValue)
+  const isInputValueValid = isValidIconName(inputValue, icons)
+
   return (
     <div className="icon-autocomplete" ref={wrapperRef}>
       <div className="icon-input-wrapper">
-        {inputValue && (
+        {sanitizedInputValue && isInputValueValid && (
           <img
-            src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${inputValue}.svg`}
+            src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${sanitizedInputValue}.svg`}
             alt=""
             className="icon-preview-input"
             onError={(e) => e.target.style.display = 'none'}
@@ -124,29 +157,33 @@ function IconAutocomplete({ value, onChange, placeholder }) {
 
       {showSuggestions && suggestions.length > 0 && (
         <div className="icon-suggestions">
-          {suggestions.map((icon, index) => (
-            <div
-              key={icon.name}
-              className={`icon-suggestion-item ${index === selectedIndex ? 'selected' : ''}`}
-              onClick={() => handleSelectIcon(icon.name)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              <img
-                src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${icon.name}.svg`}
-                alt={icon.name}
-                className="icon-suggestion-preview"
-                onError={(e) => e.target.style.display = 'none'}
-              />
-              <div className="icon-suggestion-info">
-                <div className="icon-suggestion-name">{icon.name}</div>
-                {icon.categories && icon.categories.length > 0 && (
-                  <div className="icon-suggestion-categories">
-                    {icon.categories.slice(0, 3).join(', ')}
-                  </div>
-                )}
+          {suggestions.map((icon, index) => {
+            // Sanitize each icon name from the suggestions list
+            const sanitizedIconName = sanitizeIconName(icon.name)
+            return (
+              <div
+                key={icon.name}
+                className={`icon-suggestion-item ${index === selectedIndex ? 'selected' : ''}`}
+                onClick={() => handleSelectIcon(icon.name)}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <img
+                  src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${sanitizedIconName}.svg`}
+                  alt={icon.name}
+                  className="icon-suggestion-preview"
+                  onError={(e) => e.target.style.display = 'none'}
+                />
+                <div className="icon-suggestion-info">
+                  <div className="icon-suggestion-name">{icon.name}</div>
+                  {icon.categories && icon.categories.length > 0 && (
+                    <div className="icon-suggestion-categories">
+                      {icon.categories.slice(0, 3).join(', ')}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
