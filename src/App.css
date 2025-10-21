@@ -354,11 +354,30 @@ h1 {
 }
 
 /* Service name - prominent */
+.service-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .service-name {
     font-size: 1rem;
     font-weight: 500;
     color: #e5e5e5;
     line-height: 1.4;
+}
+
+.service-description {
+    font-size: 0.875rem;
+    color: #a0a0a0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .service-url {

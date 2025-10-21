@@ -121,6 +121,7 @@ Create `data/config.json`:
 - Dark theme with responsive design
 - PWA with offline support
 - Optional authentication with passkey support
+- Automatic host detection for reverse proxy setups
 
 ## Environment Variables
 
@@ -128,6 +129,17 @@ Create `data/config.json`:
 |----------|-------------|
 | `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
 | `ADMIN_PASSWORD` | Admin panel password |
+
+## Passkey Authentication
+
+Passkey authentication works automatically with reverse proxies. The application detects the host from request headers (`X-Forwarded-Host`, `X-Forwarded-Proto`) and configures WebAuthn appropriately.
+
+**Requirements:**
+- Enable authentication by setting `ADMIN_USERNAME` and `ADMIN_PASSWORD`
+- Access the admin panel via HTTPS in production (required for passkeys)
+- Your reverse proxy must forward the correct headers
+
+**Note:** Passkeys registered on one domain (e.g., `admin.example.com`) will only work on that same domain or subdomains of the registrable domain (`example.com`).
 
 ## Service Fields
 

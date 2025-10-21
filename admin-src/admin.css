@@ -276,16 +276,24 @@ button:disabled {
 }
 
 .form-group input[type="text"],
-.form-group input[type="password"] {
+.form-group input[type="password"],
+.form-group textarea {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid #ced4da;
   border-radius: 4px;
   font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
 .form-group input[type="text"]:focus,
-.form-group input[type="password"]:focus {
+.form-group input[type="password"]:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
@@ -457,6 +465,96 @@ button:disabled {
 
 .category-tag .remove-tag:hover {
   color: #dc3545;
+}
+
+/* Icon Autocomplete */
+.icon-autocomplete {
+  position: relative;
+}
+
+.icon-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon-preview-input {
+  position: absolute;
+  left: 0.75rem;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.icon-input-wrapper input.has-icon {
+  padding-left: 3rem;
+}
+
+.icon-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.icon-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.icon-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.icon-suggestion-item:hover,
+.icon-suggestion-item.selected {
+  background-color: #f8f9fa;
+}
+
+.icon-suggestion-preview {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.icon-suggestion-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-suggestion-name {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.icon-suggestion-categories {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+/* Service list icon preview */
+.service-icon-preview {
+  width: 24px;
+  height: 24px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
 }
 
 .config-footer {

@@ -354,6 +354,76 @@ app.get('/api/config', async (req, res) => {
   }
 })
 
+// API endpoint to get available icons for autocomplete
+app.get('/api/icons', async (req, res) => {
+  try {
+    const metadata = await loadIconsMetadata()
+    // Return simplified list with name and categories
+    const iconList = metadata.map(icon => ({
+      name: icon.name,
+      categories: icon.categories || [],
+      aliases: icon.aliases || []
+    }))
+    res.json(iconList)
+  } catch (error) {
+    console.error('Failed to get icons:', error)
+    res.status(500).json({ error: 'Failed to get icons' })
+  }
+})
+
+// Icon format cache - stores which icons exist in SVG vs PNG
+const iconFormatCache = new Map()
+
+// API endpoint to check icon format availability and cache it
+app.post('/api/icons/check-format', async (req, res) => {
+  try {
+    const { iconName } = req.body
+
+    if (!iconName) {
+      return res.status(400).json({ error: 'Icon name required' })
+    }
+
+    // Check cache first
+    if (iconFormatCache.has(iconName)) {
+      return res.json(iconFormatCache.get(iconName))
+    }
+
+    // Check if SVG exists
+    const svgUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`
+    try {
+      const svgResponse = await fetch(svgUrl, { method: 'HEAD' })
+      const result = {
+        iconName,
+        format: svgResponse.ok ? 'svg' : 'png',
+        svgUrl: svgResponse.ok ? svgUrl : null,
+        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+      }
+
+      iconFormatCache.set(iconName, result)
+      return res.json(result)
+    } catch (error) {
+      // If fetch fails, assume PNG
+      const result = {
+        iconName,
+        format: 'png',
+        svgUrl: null,
+        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+      }
+      iconFormatCache.set(iconName, result)
+      return res.json(result)
+    }
+  } catch (error) {
+    console.error('Failed to check icon format:', error)
+    res.status(500).json({ error: 'Failed to check icon format' })
+  }
+})
+
+// API endpoint to get icon format cache (for bulk loading)
+app.get('/api/icons/format-cache', (req, res) => {
+  const cache = Object.fromEntries(iconFormatCache)
+  res.json(cache)
+})
+
 // Helper function to load service overrides
 async function loadServiceOverrides() {
   try {
@@ -376,6 +446,7 @@ function mergeServiceWithOverride(service, override) {
   return {
     ...service,
     ...(override.name !== undefined && { name: override.name }),
+    ...(override.description !== undefined && { description: override.description }),
     ...(override.icon !== undefined && { icon: override.icon }),
     ...(override.categories !== undefined && { categories: override.categories }),
     ...(override.hidden !== undefined && { hidden: override.hidden }),

@@ -64,7 +64,7 @@ function AdminApp() {
       <header className="admin-header">
         <div className="header-title">
           <img src="/icon.svg" alt="Logo" className="header-logo" />
-          <h1>Services Dashboard - Management Tool</h1>
+          <h1>Services Dashboard Management</h1>
         </div>
         <nav className="admin-nav">
           <button

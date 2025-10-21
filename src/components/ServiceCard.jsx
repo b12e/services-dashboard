@@ -127,8 +127,13 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
           {iconText}
         </span>
       </div>
-      <div className="service-name">{service.name}</div>
-      <div className="service-url">{displayUrl}</div>
+      <div className="service-info">
+        <div className="service-name">{service.name}</div>
+        {service.description && (
+          <div className="service-description">{service.description}</div>
+        )}
+        <div className="service-url">{displayUrl}</div>
+      </div>
     </a>
   )
 }
@@ -138,6 +143,7 @@ ServiceCard.propTypes = {
     name: PropTypes.string.isRequired,
     url: PropTypes.string,
     icon: PropTypes.string,
+    description: PropTypes.string,
     appendBaseDomain: PropTypes.bool
   }).isRequired,
   baseUrl: PropTypes.string,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import IconAutocomplete from './IconAutocomplete'
 
 function ServicesManager() {
   const [services, setServices] = useState([])
@@ -6,6 +7,11 @@ function ServicesManager() {
   const [editingIndex, setEditingIndex] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [showAddForm, setShowAddForm] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterSource, setFilterSource] = useState('all') // all, manual, npm
+  const [filterVisibility, setFilterVisibility] = useState('all') // all, visible, hidden
+  const [sortBy, setSortBy] = useState('name') // name, source, categories
+  const [sortOrder, setSortOrder] = useState('asc') // asc, desc
 
   useEffect(() => {
     loadServices()
@@ -100,6 +106,51 @@ function ServicesManager() {
     setEditForm({})
   }
 
+  // Filter and sort services
+  const filteredAndSortedServices = services
+    .filter(service => {
+      // Search filter
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase()
+        if (!service.name?.toLowerCase().includes(search) &&
+            !service.url?.toLowerCase().includes(search) &&
+            !service.description?.toLowerCase().includes(search)) {
+          return false
+        }
+      }
+
+      // Source filter
+      if (filterSource === 'manual' && service._source !== 'manual') return false
+      if (filterSource === 'npm' && service._source !== 'npm') return false
+
+      // Visibility filter
+      if (filterVisibility === 'visible' && service.hidden) return false
+      if (filterVisibility === 'hidden' && !service.hidden) return false
+
+      return true
+    })
+    .sort((a, b) => {
+      let comparison = 0
+
+      switch (sortBy) {
+        case 'name':
+          comparison = (a.name || '').localeCompare(b.name || '')
+          break
+        case 'source':
+          comparison = (a._source || '').localeCompare(b._source || '')
+          break
+        case 'categories':
+          const aCat = Array.isArray(a.categories) ? a.categories.join(', ') : (a.category || '')
+          const bCat = Array.isArray(b.categories) ? b.categories.join(', ') : (b.category || '')
+          comparison = aCat.localeCompare(bCat)
+          break
+        default:
+          comparison = 0
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
   if (loading) {
     return <div className="loading">Loading services...</div>
   }
@@ -107,7 +158,7 @@ function ServicesManager() {
   return (
     <div className="services-manager">
       <div className="manager-header">
-        <h2>Manage Services</h2>
+        <h2>Manage Services ({filteredAndSortedServices.length} of {services.length})</h2>
         <button
           className="btn-primary"
           onClick={() => setShowAddForm(!showAddForm)}
@@ -123,54 +174,125 @@ function ServicesManager() {
         />
       )}
 
-      <div className="services-list">
-        {services.length === 0 ? (
-          <p className="empty-state">No services configured. Add one to get started!</p>
+      {/* Filters and search */}
+      <div className="services-filters">
+        <div className="filter-group">
+          <input
+            type="text"
+            placeholder="Search services..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+
+        <div className="filter-group">
+          <label>Source:</label>
+          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
+            <option value="all">All</option>
+            <option value="manual">Manual</option>
+            <option value="npm">NPM</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Visibility:</label>
+          <select value={filterVisibility} onChange={(e) => setFilterVisibility(e.target.value)}>
+            <option value="all">All</option>
+            <option value="visible">Visible</option>
+            <option value="hidden">Hidden</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Sort by:</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="name">Name</option>
+            <option value="source">Source</option>
+            <option value="categories">Categories</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="sort-order-btn"
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
+      </div>
+
+      {/* Table View */}
+      <div className="services-table-wrapper">
+        {filteredAndSortedServices.length === 0 ? (
+          <p className="empty-state">
+            {services.length === 0 ? 'No services configured. Add one to get started!' : 'No services match your filters.'}
+          </p>
+        ) : editingIndex ? (
+          <div className="edit-panel">
+            <ServiceForm
+              initialData={editForm}
+              onSubmit={(data) => handleUpdate(editingIndex, data)}
+              onCancel={cancelEdit}
+              isEditing
+              isNpmService={editForm._source === 'npm'}
+            />
+          </div>
         ) : (
-          services.map((service) => (
-            <div key={service._id} className={`service-item ${service._source === 'npm' ? 'npm-source' : ''}`}>
-              {editingIndex === service._id ? (
-                <ServiceForm
-                  initialData={editForm}
-                  onSubmit={(data) => handleUpdate(service._id, data)}
-                  onCancel={cancelEdit}
-                  isEditing
-                  isNpmService={service._source === 'npm'}
-                />
-              ) : (
-                <div className="service-display">
-                  <div className="service-info">
-                    <h3>
-                      {service.name || 'Unnamed Service'}
+          <table className="services-table">
+            <thead>
+              <tr>
+                <th>Icon</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>URL</th>
+                <th>Source</th>
+                <th>Categories</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedServices.map((service) => (
+                <tr key={service._id} className={service.hidden ? 'hidden-service' : ''}>
+                  <td className="icon-cell">
+                    {service.icon && (
+                      <img
+                        src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${service.icon}.svg`}
+                        alt=""
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    )}
+                  </td>
+                  <td className="name-cell">
+                    <div className="name-badges">
+                      {service.name}
                       {service._source === 'npm' && <span className="badge-npm">NPM</span>}
                       {service._hasOverrides && <span className="badge-override">Customized</span>}
-                    </h3>
-                    <div className="service-details">
-                      <div><strong>Source:</strong> {service._source === 'npm' ? 'NPM Auto-discovered' : 'Manual'}</div>
-                      <div><strong>URL Type:</strong> {service.appendBaseDomain !== false ? 'Subdomain' : 'Full URL'}</div>
-                      <div><strong>URL:</strong> {service.url}</div>
-                      <div><strong>Icon:</strong> {service.icon || 'Auto'}</div>
-                      <div>
-                        <strong>Categories:</strong>{' '}
-                        {service.categories && service.categories.length > 0
-                          ? service.categories.join(', ')
-                          : (service.category || 'Auto')}
-                      </div>
-                      {service.hidden && <div className="badge-hidden">Hidden</div>}
                     </div>
-                  </div>
-                  <div className="service-actions">
-                    <button onClick={() => startEdit(service._id, service)}>
+                  </td>
+                  <td className="description-cell">{service.description || '-'}</td>
+                  <td className="url-cell">{service.url}</td>
+                  <td className="source-cell">{service._source === 'npm' ? 'NPM' : 'Manual'}</td>
+                  <td className="categories-cell">
+                    {service.categories && service.categories.length > 0
+                      ? service.categories.join(', ')
+                      : (service.category || '-')}
+                  </td>
+                  <td className="status-cell">
+                    {service.hidden ? <span className="badge-hidden-sm">Hidden</span> : <span className="badge-visible">Visible</span>}
+                  </td>
+                  <td className="actions-cell">
+                    <button onClick={() => startEdit(service._id, service)} className="btn-small btn-edit">
                       {service._source === 'npm' ? 'Customize' : 'Edit'}
                     </button>
-                    <button onClick={() => handleDelete(service._id, service._source)} className="btn-danger">
+                    <button onClick={() => handleDelete(service._id, service._source)} className="btn-small btn-danger">
                       {service._source === 'npm' ? 'Reset' : 'Delete'}
                     </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
@@ -184,6 +306,7 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
   const [urlMode, setUrlMode] = useState(initialMode)
   const [formData, setFormData] = useState({
     name: initialData.name || '',
+    description: initialData.description || '',
     url: initialData.url || '',
     icon: initialData.icon || '',
     categories: Array.isArray(initialData.categories) ? initialData.categories :
@@ -228,6 +351,7 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
     // Create clean object
     const cleanData = {
       name: formData.name,
+      description: formData.description || undefined,
       icon: formData.icon,
       categories: formData.categories.length > 0 ? formData.categories : undefined,
       hidden: formData.hidden
@@ -260,6 +384,19 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
           placeholder="e.g., Plex, Sonarr"
           required
         />
+      </div>
+
+      <div className="form-group">
+        <label>Description (optional)</label>
+        <textarea
+          value={formData.description}
+          onChange={(e) => handleChange('description', e.target.value)}
+          placeholder="e.g., Media streaming server"
+          rows="2"
+        />
+        <p className="help-text">
+          A short description shown under the service name
+        </p>
       </div>
 
       {!isNpmService && (
@@ -326,12 +463,14 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
 
       <div className="form-group">
         <label>Icon (optional)</label>
-        <input
-          type="text"
+        <IconAutocomplete
           value={formData.icon}
-          onChange={(e) => handleChange('icon', e.target.value)}
+          onChange={(value) => handleChange('icon', value)}
           placeholder="e.g., plex, github (leave empty for auto)"
         />
+        <p className="help-text">
+          Start typing to search from 2000+ icons. Leave empty for auto-detection.
+        </p>
       </div>
 
       <div className="form-group">

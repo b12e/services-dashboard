@@ -24,8 +24,36 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-in-prod
 
 // WebAuthn configuration
 const RP_NAME = 'Services Dashboard'
-const RP_ID = process.env.RP_ID || 'localhost'
-const ORIGIN = process.env.ORIGIN || `http://localhost:${PORT}`
+
+// Helper function to extract RP_ID and Origin from request
+// This works correctly behind reverse proxies
+function getWebAuthnConfig(req) {
+  // Get the host from headers (works with reverse proxy)
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost'
+  const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')
+
+  // Extract the registrable domain for RP_ID
+  // For example: dashboard-admin.local.b12e.es -> b12e.es
+  // Or: localhost:3001 -> localhost
+  let rpID
+  if (host.includes('localhost')) {
+    rpID = 'localhost'
+  } else {
+    // Remove port if present
+    const hostWithoutPort = host.split(':')[0]
+    const parts = hostWithoutPort.split('.')
+    // Get the last two parts (domain.tld)
+    if (parts.length >= 2) {
+      rpID = parts.slice(-2).join('.')
+    } else {
+      rpID = hostWithoutPort
+    }
+  }
+
+  const origin = `${proto}://${host}`
+
+  return { rpID, origin }
+}
 
 // Path to files - all stored in /app/data directory
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data')
@@ -229,11 +257,20 @@ app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
 // Generate registration options for new passkey
 app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, res) => {
   try {
+    const { rpID, origin } = getWebAuthnConfig(req)
+
+    console.log('Generating passkey registration options...')
+    console.log('  Request host:', req.headers.host)
+    console.log('  X-Forwarded-Host:', req.headers['x-forwarded-host'])
+    console.log('  X-Forwarded-Proto:', req.headers['x-forwarded-proto'])
+    console.log('  Detected RP_ID:', rpID)
+    console.log('  Detected ORIGIN:', origin)
+
     const authData = await loadAuthData()
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpID: RP_ID,
+      rpID: rpID,
       userID: 'admin',
       userName: ADMIN_USERNAME || 'admin',
       attestationType: 'none',
@@ -248,17 +285,24 @@ app.post('/api/admin/auth/passkeys/register/options', requireAuth, async (req, r
       })) || [],
     })
 
+    console.log('Registration options generated successfully')
     challenges.set('admin', options.challenge)
     res.json(options)
   } catch (error) {
     console.error('Error generating registration options:', error)
-    res.status(500).json({ error: 'Failed to generate registration options' })
+    console.error('Error stack:', error.stack)
+    res.status(500).json({
+      error: 'Failed to generate registration options',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 })
 
 // Verify passkey registration
 app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, res) => {
   try {
+    const { rpID, origin } = getWebAuthnConfig(req)
     const { credential, name } = req.body
     const expectedChallenge = challenges.get('admin')
 
@@ -269,8 +313,8 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
     const verification = await verifyRegistrationResponse({
       response: credential,
       expectedChallenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
     })
 
     if (verification.verified && verification.registrationInfo) {
@@ -306,6 +350,7 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
 // Generate authentication options for passkey login
 app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
   try {
+    const { rpID } = getWebAuthnConfig(req)
     const authData = await loadAuthData()
 
     if (!authData.passkeys || authData.passkeys.length === 0) {
@@ -313,7 +358,7 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
     }
 
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
+      rpID: rpID,
       allowCredentials: authData.passkeys.map(passkey => ({
         id: new Uint8Array(passkey.credentialID),
         type: 'public-key',
@@ -333,6 +378,7 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
 // Verify passkey authentication
 app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
   try {
+    const { rpID, origin } = getWebAuthnConfig(req)
     const { credential } = req.body
     const expectedChallenge = challenges.get('admin')
 
@@ -353,8 +399,8 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
     const verification = await verifyAuthenticationResponse({
       response: credential,
       expectedChallenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
       authenticator: {
         credentialID: new Uint8Array(passkey.credentialID),
         credentialPublicKey: new Uint8Array(passkey.credentialPublicKey),
@@ -537,6 +583,7 @@ app.put('/api/admin/services/:id', requireAuth, async (req, res) => {
       // Only store the fields that are being overridden
       const override = {}
       if (updatedData.name !== undefined) override.name = updatedData.name
+      if (updatedData.description !== undefined) override.description = updatedData.description
       if (updatedData.icon !== undefined) override.icon = updatedData.icon
       if (updatedData.categories !== undefined) override.categories = updatedData.categories
       if (updatedData.hidden !== undefined) override.hidden = updatedData.hidden
