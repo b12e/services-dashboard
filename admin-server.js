@@ -409,7 +409,9 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
     const options = await generateAuthenticationOptions({
       rpID: rpID,
       allowCredentials: authData.passkeys.map(passkey => ({
-        id: isoBase64URL.toBuffer(passkey.credentialID),
+        id: Array.isArray(passkey.credentialID)
+          ? new Uint8Array(passkey.credentialID)
+          : isoBase64URL.toBuffer(passkey.credentialID),
         type: 'public-key',
         transports: passkey.transports,
       })),
@@ -436,9 +438,16 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
     }
 
     const authData = await loadAuthData()
-    const passkey = authData.passkeys?.find(p =>
-      p.credentialID === isoBase64URL.fromBuffer(new Uint8Array(credential.rawId))
-    )
+    const credentialIDString = isoBase64URL.fromBuffer(new Uint8Array(credential.rawId))
+    const passkey = authData.passkeys?.find(p => {
+      if (Array.isArray(p.credentialID)) {
+        // Old format: compare as Base64URL string
+        return isoBase64URL.fromBuffer(new Uint8Array(p.credentialID)) === credentialIDString
+      } else {
+        // New format: direct comparison
+        return p.credentialID === credentialIDString
+      }
+    })
 
     if (!passkey) {
       return res.status(400).json({ error: 'Passkey not found' })
@@ -450,8 +459,12 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        credentialID: isoBase64URL.toBuffer(passkey.credentialID),
-        credentialPublicKey: isoBase64URL.toBuffer(passkey.credentialPublicKey),
+        credentialID: Array.isArray(passkey.credentialID)
+          ? new Uint8Array(passkey.credentialID)
+          : isoBase64URL.toBuffer(passkey.credentialID),
+        credentialPublicKey: Array.isArray(passkey.credentialPublicKey)
+          ? new Uint8Array(passkey.credentialPublicKey)
+          : isoBase64URL.toBuffer(passkey.credentialPublicKey),
         counter: passkey.counter,
       },
     })
