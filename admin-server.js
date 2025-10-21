@@ -377,38 +377,30 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
     if (verification.verified && verification.registrationInfo) {
       const authData = await loadAuthData()
 
-      // Debug: Log the entire registrationInfo structure
-      console.log('Full registrationInfo:', JSON.stringify(verification.registrationInfo, (key, value) => {
-        if (value instanceof Uint8Array) {
-          return `Uint8Array(${value.length})`
-        }
-        return value
-      }))
+      // The credential data is nested under verification.registrationInfo.credential
+      const credInfo = verification.registrationInfo.credential
+      const credentialID = credInfo.id // This is a Base64URL string
+      const credentialPublicKey = credInfo.publicKey // This is a Uint8Array
+      const counter = credInfo.counter
+      const transports = credInfo.transports || []
 
-      // The credential ID and public key should be in these fields
-      const credentialID = verification.registrationInfo.credentialID
-      const credentialPublicKey = verification.registrationInfo.credentialPublicKey
-
-      console.log('credentialID:', credentialID, 'type:', typeof credentialID, 'isUint8Array:', credentialID instanceof Uint8Array)
-      console.log('credentialPublicKey:', credentialPublicKey, 'type:', typeof credentialPublicKey, 'isUint8Array:', credentialPublicKey instanceof Uint8Array)
+      console.log('credentialID:', credentialID, 'type:', typeof credentialID)
+      console.log('credentialPublicKey type:', typeof credentialPublicKey, 'isUint8Array:', credentialPublicKey instanceof Uint8Array)
 
       // Convert to Base64URL strings
-      const credentialIDBase64 = credentialID instanceof Uint8Array
-        ? isoBase64URL.fromBuffer(credentialID)
-        : (typeof credentialID === 'string' ? credentialID : '')
-
+      const credentialIDBase64 = credentialID // Already a Base64URL string
       const publicKeyBase64 = credentialPublicKey instanceof Uint8Array
         ? isoBase64URL.fromBuffer(credentialPublicKey)
-        : (typeof credentialPublicKey === 'string' ? credentialPublicKey : '')
+        : credentialPublicKey
 
-      console.log('After conversion - credentialIDBase64:', credentialIDBase64, 'length:', credentialIDBase64.length)
-      console.log('After conversion - publicKeyBase64:', publicKeyBase64, 'length:', publicKeyBase64.length)
+      console.log('Storing - credentialIDBase64:', credentialIDBase64)
+      console.log('Storing - publicKeyBase64 length:', publicKeyBase64.length)
 
       const newPasskey = {
         credentialID: credentialIDBase64,
         credentialPublicKey: publicKeyBase64,
-        counter: verification.registrationInfo.counter,
-        transports: credential.response.transports || [],
+        counter: counter,
+        transports: transports,
         name: name || `Passkey ${(authData.passkeys?.length || 0) + 1}`,
         createdAt: new Date().toISOString()
       }
@@ -441,26 +433,13 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
       return res.status(400).json({ error: 'No passkeys registered' })
     }
 
-    console.log('Passkeys found:', authData.passkeys.length)
-    authData.passkeys.forEach((pk, i) => {
-      console.log(`Passkey ${i}: credentialID type:`, typeof pk.credentialID,
-                  'isArray:', Array.isArray(pk.credentialID),
-                  'value:', pk.credentialID)
-    })
-
     const options = await generateAuthenticationOptions({
       rpID: rpID,
-      allowCredentials: authData.passkeys.map(passkey => {
-        const credID = Array.isArray(passkey.credentialID)
-          ? new Uint8Array(passkey.credentialID)
-          : isoBase64URL.toBuffer(passkey.credentialID)
-        console.log('Converted credentialID to:', credID)
-        return {
-          id: credID,
-          type: 'public-key',
-          transports: passkey.transports,
-        }
-      }),
+      allowCredentials: authData.passkeys.map(passkey => ({
+        id: passkey.credentialID, // Already a Base64URL string
+        type: 'public-key',
+        transports: passkey.transports,
+      })),
       userVerification: 'preferred',
     })
 
@@ -485,15 +464,7 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
 
     const authData = await loadAuthData()
     const credentialIDString = isoBase64URL.fromBuffer(new Uint8Array(credential.rawId))
-    const passkey = authData.passkeys?.find(p => {
-      if (Array.isArray(p.credentialID)) {
-        // Old format: compare as Base64URL string
-        return isoBase64URL.fromBuffer(new Uint8Array(p.credentialID)) === credentialIDString
-      } else {
-        // New format: direct comparison
-        return p.credentialID === credentialIDString
-      }
-    })
+    const passkey = authData.passkeys?.find(p => p.credentialID === credentialIDString)
 
     if (!passkey) {
       return res.status(400).json({ error: 'Passkey not found' })
@@ -505,12 +476,8 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        credentialID: Array.isArray(passkey.credentialID)
-          ? new Uint8Array(passkey.credentialID)
-          : isoBase64URL.toBuffer(passkey.credentialID),
-        credentialPublicKey: Array.isArray(passkey.credentialPublicKey)
-          ? new Uint8Array(passkey.credentialPublicKey)
-          : isoBase64URL.toBuffer(passkey.credentialPublicKey),
+        credentialID: passkey.credentialID, // Base64URL string
+        credentialPublicKey: passkey.credentialPublicKey, // Base64URL string
         counter: passkey.counter,
       },
     })
