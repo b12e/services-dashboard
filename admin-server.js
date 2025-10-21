@@ -548,11 +548,16 @@ app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, async (req, r
       return res.status(400).json({ error: 'Passkey not found' })
     }
 
-    // Convert stored Base64URL strings back to Uint8Arrays for verification
-    const authenticator = {
-      credentialID: isoBase64URL.toBuffer(passkey.credentialID),
-      credentialPublicKey: isoBase64URL.toBuffer(passkey.credentialPublicKey),
+    // In @simplewebauthn/server v13+, the API changed:
+    // - Parameter name: authenticator → credential
+    // - Property names: credentialID → id, credentialPublicKey → publicKey
+    console.log('Preparing credential for verification (v13+ API)')
+
+    const credentialForVerification = {
+      id: passkey.credentialID,  // Keep as Base64URL string
+      publicKey: isoBase64URL.toBuffer(passkey.credentialPublicKey), // Convert to Uint8Array
       counter: passkey.counter,
+      transports: passkey.transports
     }
 
     console.log('Verifying passkey authentication...')
@@ -562,7 +567,7 @@ app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, async (req, r
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: authenticator,
+      credential: credentialForVerification, // Changed from 'authenticator' to 'credential'
     })
 
     console.log('Verification result:', verification.verified)
