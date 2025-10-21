@@ -7,6 +7,7 @@ import express from 'express'
 import { readFile } from 'fs/promises'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { categorizeService } from './categorize.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -475,31 +476,116 @@ function mergeServiceWithOverride(service, override) {
   }
 }
 
-// Serve services.json - merges NPM services with overrides and manual services
+// Helper function to get all visible services (used by both endpoints)
+async function getAllVisibleServices() {
+  const config = await loadConfig()
+  const { manualServices, overrides } = await loadServiceOverrides()
+
+  let allServices = [...manualServices.filter(s => !s.hidden)]
+
+  // If NPM is enabled, fetch and merge NPM services
+  if (config.npmEnabled && config.npmConnections?.length > 0) {
+    const npmServices = await fetchNPMServices()
+
+    // Apply overrides to NPM services
+    const mergedNpmServices = npmServices.map(service => {
+      const serviceId = service._npmMetadata?.id
+      const override = serviceId ? overrides[`npm_${serviceId}`] : null
+      return mergeServiceWithOverride(service, override)
+    })
+
+    // Filter out hidden NPM services
+    const visibleNpmServices = mergedNpmServices.filter(s => !s.hidden)
+    allServices = [...allServices, ...visibleNpmServices]
+  }
+
+  // Auto-categorize services that don't have categories yet
+  // This ensures categories are applied but allows manual customization
+  const categorizedServices = allServices.map(service => {
+    if (service.categories && service.categories.length > 0) {
+      // Service already has categories (manual or from override)
+      return service
+    }
+    // Auto-categorize services without categories
+    return {
+      ...service,
+      categories: categorizeService(service)
+    }
+  })
+
+  return categorizedServices
+}
+
+// Helper function to extract categories from services
+async function getAllCategories() {
+  const config = await loadConfig()
+  const services = await getAllVisibleServices()
+  const configuredCategories = config.categories || []
+
+  // Extract all category names from services
+  const categoryNamesFromServices = new Set()
+  services.forEach(service => {
+    if (Array.isArray(service.categories)) {
+      service.categories.forEach(cat => categoryNamesFromServices.add(cat))
+    } else if (service.category) {
+      categoryNamesFromServices.add(service.category)
+    }
+  })
+
+  // Create category map
+  const categoryMap = new Map()
+
+  // Add configured categories first (with their display names and visibility)
+  configuredCategories.forEach(cat => {
+    categoryMap.set(cat.name, {
+      name: cat.name,
+      displayName: cat.displayName || cat.name,
+      visible: cat.visible !== undefined ? cat.visible : true
+    })
+  })
+
+  // Add auto-detected categories that aren't configured
+  categoryNamesFromServices.forEach(name => {
+    if (!categoryMap.has(name)) {
+      categoryMap.set(name, {
+        name: name,
+        displayName: name,
+        visible: true
+      })
+    }
+  })
+
+  // Return only visible categories
+  return Array.from(categoryMap.values()).filter(cat => cat.visible)
+}
+
+// PUBLIC API: Get all visible services
+app.get('/api/public/services', async (req, res) => {
+  try {
+    const services = await getAllVisibleServices()
+    res.json(services)
+  } catch (error) {
+    console.error('Error getting services:', error)
+    res.status(500).json({ error: 'Failed to get services' })
+  }
+})
+
+// PUBLIC API: Get all visible categories
+app.get('/api/public/categories', async (req, res) => {
+  try {
+    const categories = await getAllCategories()
+    res.json(categories)
+  } catch (error) {
+    console.error('Error getting categories:', error)
+    res.status(500).json({ error: 'Failed to get categories' })
+  }
+})
+
+// Legacy endpoint - Serve services.json for backward compatibility
 app.get('/services.json', async (req, res) => {
   try {
-    const config = await loadConfig()
-    const { manualServices, overrides } = await loadServiceOverrides()
-
-    let allServices = [...manualServices]
-
-    // If NPM is enabled, fetch and merge NPM services
-    if (config.npmEnabled && config.npmConnections?.length > 0) {
-      const npmServices = await fetchNPMServices()
-
-      // Apply overrides to NPM services
-      const mergedNpmServices = npmServices.map(service => {
-        const serviceId = service._npmMetadata?.id
-        const override = serviceId ? overrides[`npm_${serviceId}`] : null
-        return mergeServiceWithOverride(service, override)
-      })
-
-      // Filter out hidden NPM services
-      const visibleNpmServices = mergedNpmServices.filter(s => !s.hidden)
-      allServices = [...allServices, ...visibleNpmServices]
-    }
-
-    res.json({ services: allServices })
+    const services = await getAllVisibleServices()
+    res.json({ services })
   } catch (error) {
     console.error('Error building services list:', error)
     res.json({ services: [] })

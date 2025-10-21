@@ -50,10 +50,10 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
             className={`sidebar-item ${selectedCategory === 'all' ? 'active' : ''}`}
             onClick={() => handleCategoryClick('all')}
           >
-            <span className="sidebar-item-label">All Services</span>
-            <span className="sidebar-item-count">{categories.all || 0}</span>
+            <span className="sidebar-item-label">{categories.displayNames?.all || 'All Services'}</span>
+            <span className="sidebar-item-count">{categories.counts?.all || 0}</span>
           </button>
-          {Object.entries(categories)
+          {Object.entries(categories.counts || {})
             .filter(([key]) => key !== 'all')
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([category, count]) => (
@@ -62,7 +62,7 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
                 className={`sidebar-item ${selectedCategory === category ? 'active' : ''}`}
                 onClick={() => handleCategoryClick(category)}
               >
-                <span className="sidebar-item-label">{formatCategoryName(category)}</span>
+                <span className="sidebar-item-label">{categories.displayNames?.[category] || formatCategoryName(category)}</span>
                 <span className="sidebar-item-count">{count}</span>
               </button>
             ))}

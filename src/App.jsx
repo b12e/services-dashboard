@@ -3,9 +3,6 @@ import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import ServicesGrid from './components/ServicesGrid'
 import Sidebar from './components/Sidebar'
-import { categorizeService } from './utils/categorize'
-import { fetchNPMServices, mergeServices } from './services/npmService'
-import { preloadIconsMetadata } from './services/iconService'
 import './App.css'
 
 function App() {
@@ -20,13 +17,7 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [customName, setCustomName] = useState('Services Dashboard')
   const [customIcon, setCustomIcon] = useState(null)
-
-  // Preload icons metadata on app start
-  useEffect(() => {
-    preloadIconsMetadata().catch(() => {
-      // Silently fail - icons will fall back to initials
-    })
-  }, [])
+  const [configuredCategories, setConfiguredCategories] = useState([])
 
   // Load branding from API
   useEffect(() => {
@@ -74,48 +65,43 @@ function App() {
     loadConfiguration()
   }, [])
 
-  // Load services (both manual and NPM auto-detected)
+  // Load configured categories from public API
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const response = await fetch('/api/public/categories')
+        if (response.ok) {
+          const categories = await response.json()
+          setConfiguredCategories(categories)
+        }
+      } catch (error) {
+        // Silently fail - will auto-detect from services
+      }
+    }
+    loadCategories()
+  }, [])
+
+  // Load services using public API
   useEffect(() => {
     // Wait for configuration to be loaded
     if (!configLoaded) return
 
     async function loadServices() {
       try {
-        let manualServices = []
-        let npmServices = []
-
-        // Always try to load manual services from services.json
-        try {
-          const response = await fetch('/services.json')
-          if (response.ok) {
-            const data = await response.json()
-            if (data.services && Array.isArray(data.services)) {
-              manualServices = data.services
-            }
-          }
-        } catch (err) {
-          // Silently fail - services.json is optional
+        // Use the new public API endpoint
+        const response = await fetch('/api/public/services')
+        if (!response.ok) {
+          throw new Error('Failed to load services from API')
         }
 
-        // Fetch NPM services only if NPM is enabled on the server
-        if (npmEnabled) {
-          npmServices = await fetchNPMServices()
-        }
+        const servicesData = await response.json()
 
-        // Merge manual and NPM services (manual takes priority on URL conflicts)
-        const mergedServices = await mergeServices(manualServices, npmServices, baseUrl)
-
-        if (mergedServices.length === 0) {
+        if (!Array.isArray(servicesData) || servicesData.length === 0) {
           throw new Error('No services configured. Visit the admin panel at port 3001 to add services or configure NPM integration.')
         }
 
-        // Auto-categorize all services (now returns array of categories)
-        const categorizedServices = mergedServices.map(service => ({
-          ...service,
-          categories: categorizeService(service)
-        }))
-
-        setServices(categorizedServices)
+        // Services already come with categories and baseUrl applied from server
+        setServices(servicesData)
         setLoading(false)
       } catch (error) {
         console.error('Error loading services:', error)
@@ -143,15 +129,24 @@ function App() {
     setIsMobileMenuOpen(false)
   }, [])
 
-  // Calculate category counts (services can be in multiple categories)
+  // Calculate category counts using configured categories with display names
   const categories = useMemo(() => {
     const counts = { all: services.length }
+    const displayNames = { all: 'All Services' }
+
+    // Build a map of category name to display name from configured categories
+    const categoryDisplayMap = {}
+    configuredCategories.forEach(cat => {
+      categoryDisplayMap[cat.name] = cat.displayName
+    })
 
     // First pass: Count all categories
     services.forEach(service => {
       if (service.categories && Array.isArray(service.categories)) {
         service.categories.forEach(category => {
           counts[category] = (counts[category] || 0) + 1
+          // Use configured display name if available, otherwise use the category name
+          displayNames[category] = categoryDisplayMap[category] || category
         })
       }
     })
@@ -159,6 +154,7 @@ function App() {
     // Second pass: Filter out single-entry categories
     // BUT keep them if they're the only category for at least one service
     const filteredCounts = { all: counts.all }
+    const filteredDisplayNames = { all: displayNames.all }
 
     Object.entries(counts).forEach(([category, count]) => {
       if (category === 'all') return
@@ -166,6 +162,7 @@ function App() {
       // If category has more than 1 service, always include it
       if (count > 1) {
         filteredCounts[category] = count
+        filteredDisplayNames[category] = displayNames[category]
         return
       }
 
@@ -177,6 +174,7 @@ function App() {
       if (serviceWithThisCategory && serviceWithThisCategory.categories.length === 1) {
         // This is the only category for this service, so keep it
         filteredCounts[category] = count
+        filteredDisplayNames[category] = displayNames[category]
       }
       // Otherwise, skip this single-entry category
     })
@@ -195,23 +193,26 @@ function App() {
       const otherCategories = categoriesWithoutAll.slice(MAX_REGULAR_CATEGORIES)
 
       const finalCounts = { all: filteredCounts.all }
+      const finalDisplayNames = { all: filteredDisplayNames.all }
 
       // Add top categories
       topCategories.forEach(([category, count]) => {
         finalCounts[category] = count
+        finalDisplayNames[category] = filteredDisplayNames[category]
       })
 
       // Combine remaining categories into "Other"
       const otherCount = otherCategories.reduce((sum, [, count]) => sum + count, 0)
       if (otherCount > 0 || filteredCounts.Other) {
         finalCounts.Other = (filteredCounts.Other || 0) + otherCount
+        finalDisplayNames.Other = 'Other'
       }
 
-      return finalCounts
+      return { counts: finalCounts, displayNames: finalDisplayNames }
     }
 
-    return filteredCounts
-  }, [services])
+    return { counts: filteredCounts, displayNames: filteredDisplayNames }
+  }, [services, configuredCategories])
 
   // Filter and sort services based on search term and category
   const filteredServices = useMemo(() => {

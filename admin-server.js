@@ -463,8 +463,17 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
     }
 
     const authData = await loadAuthData()
-    const credentialIDString = isoBase64URL.fromBuffer(new Uint8Array(credential.rawId))
+
+    console.log('Login attempt - credential.rawId:', credential.rawId, 'type:', typeof credential.rawId)
+    console.log('Login attempt - credential.id:', credential.id, 'type:', typeof credential.id)
+    console.log('Stored passkeys:', authData.passkeys?.map(p => ({ id: p.credentialID, name: p.name })))
+
+    // credential.id is already a Base64URL string, use it directly
+    const credentialIDString = credential.id
     const passkey = authData.passkeys?.find(p => p.credentialID === credentialIDString)
+
+    console.log('Searching for credentialID:', credentialIDString)
+    console.log('Passkey found:', !!passkey)
 
     if (!passkey) {
       return res.status(400).json({ error: 'Passkey not found' })
