@@ -631,6 +631,69 @@ app.delete('/api/admin/services/:id', requireAuth, async (req, res) => {
   }
 })
 
+// GET /api/admin/categories - Get all categories (configured + auto-detected)
+app.get('/api/admin/categories', requireAuth, async (req, res) => {
+  try {
+    // Load config for configured categories
+    const configData = await fs.readFile(CONFIG_PATH, 'utf-8')
+    const config = JSON.parse(configData)
+    const configuredCategories = config.categories || []
+
+    // Load services to find auto-detected categories
+    const { manualServices, overrides } = await loadServicesData()
+    const allCategoryNames = new Set()
+
+    // Extract categories from manual services
+    manualServices.forEach(service => {
+      if (Array.isArray(service.categories)) {
+        service.categories.forEach(cat => allCategoryNames.add(cat))
+      } else if (service.category) {
+        allCategoryNames.add(service.category)
+      }
+    })
+
+    // Extract categories from overrides
+    Object.values(overrides).forEach(override => {
+      if (Array.isArray(override.categories)) {
+        override.categories.forEach(cat => allCategoryNames.add(cat))
+      } else if (override.category) {
+        allCategoryNames.add(override.category)
+      }
+    })
+
+    // Merge configured and auto-detected categories
+    const categoryMap = new Map()
+
+    // Add configured categories first
+    configuredCategories.forEach(cat => {
+      categoryMap.set(cat.name, {
+        name: cat.name,
+        displayName: cat.displayName || cat.name,
+        visible: cat.visible !== undefined ? cat.visible : true,
+        configured: true
+      })
+    })
+
+    // Add auto-detected categories that aren't already configured
+    allCategoryNames.forEach(name => {
+      if (!categoryMap.has(name)) {
+        categoryMap.set(name, {
+          name: name,
+          displayName: name,
+          visible: true,
+          configured: false
+        })
+      }
+    })
+
+    const mergedCategories = Array.from(categoryMap.values())
+    res.json(mergedCategories)
+  } catch (error) {
+    console.error('Error loading categories:', error)
+    res.status(500).json({ error: 'Failed to load categories' })
+  }
+})
+
 // GET /api/admin/config - Get configuration
 app.get('/api/admin/config', requireAuth, async (req, res) => {
   try {
@@ -704,11 +767,11 @@ async function start() {
 ===========================================
 Management Tool Server Started
 ===========================================
-URL: ${ORIGIN}
+Port: ${PORT}
 Authentication: ${AUTH_REQUIRED ? 'ENABLED' : 'DISABLED'}
 ${AUTH_REQUIRED ? `Username: ${ADMIN_USERNAME}` : ''}
-${AUTH_REQUIRED ? `Password: ${ADMIN_PASSWORD}` : ''}
-WebAuthn RP ID: ${RP_ID}
+WebAuthn: Dynamic host detection enabled
+  (RP_ID and Origin detected from request headers)
 ===========================================
     `)
   })

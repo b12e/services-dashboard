@@ -14,10 +14,10 @@ function CategoryManager() {
 
   async function loadCategories() {
     try {
-      const response = await fetch('/api/admin/config')
+      const response = await fetch('/api/admin/categories')
       if (response.ok) {
-        const config = await response.json()
-        setCategories(config.categories || [])
+        const categories = await response.json()
+        setCategories(categories)
       }
     } catch (err) {
       console.error('Failed to load categories:', err)
@@ -33,7 +33,10 @@ function CategoryManager() {
       if (!configResponse.ok) throw new Error('Failed to load config')
 
       const config = await configResponse.json()
-      config.categories = updatedCategories
+
+      // Only save categories that are configured (not auto-detected)
+      const configuredCategories = updatedCategories.filter(cat => cat.configured !== false)
+      config.categories = configuredCategories
 
       const response = await fetch('/api/admin/config', {
         method: 'PUT',
@@ -42,7 +45,8 @@ function CategoryManager() {
       })
 
       if (response.ok) {
-        setCategories(updatedCategories)
+        // Reload all categories to get the updated merge of configured + auto-detected
+        await loadCategories()
       } else {
         alert('Failed to save categories')
       }
@@ -63,7 +67,8 @@ function CategoryManager() {
     const newCategory = {
       name: newCategoryName.trim(),
       displayName: newCategoryName.trim(),
-      visible: true
+      visible: true,
+      configured: true
     }
 
     const updatedCategories = [...categories, newCategory]
@@ -74,6 +79,8 @@ function CategoryManager() {
   function handleToggleVisibility(index) {
     const updatedCategories = [...categories]
     updatedCategories[index].visible = !updatedCategories[index].visible
+    // Mark as configured when visibility is toggled
+    updatedCategories[index].configured = true
     saveCategories(updatedCategories)
   }
 
@@ -90,6 +97,8 @@ function CategoryManager() {
 
     const updatedCategories = [...categories]
     updatedCategories[index].displayName = editName.trim()
+    // Mark as configured when renamed
+    updatedCategories[index].configured = true
     saveCategories(updatedCategories)
     setEditingIndex(null)
     setEditName('')
@@ -188,6 +197,9 @@ function CategoryManager() {
                       {category.name !== category.displayName && (
                         <span className="category-original">(originally: {category.name})</span>
                       )}
+                      <span className={`category-badge ${category.configured ? 'configured' : 'auto-detected'}`}>
+                        {category.configured ? 'Configured' : 'Auto-detected'}
+                      </span>
                       <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
                         {category.visible ? 'Visible' : 'Hidden'}
                       </span>
