@@ -369,9 +369,14 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
       const authData = await loadAuthData()
 
       // Store credentialID and publicKey as Base64URL strings for compatibility
+      const credentialIDBase64 = isoBase64URL.fromBuffer(verification.registrationInfo.credentialID)
+      const publicKeyBase64 = isoBase64URL.fromBuffer(verification.registrationInfo.credentialPublicKey)
+
+      console.log('Storing passkey with credentialID type:', typeof credentialIDBase64, 'value:', credentialIDBase64)
+
       const newPasskey = {
-        credentialID: isoBase64URL.fromBuffer(verification.registrationInfo.credentialID),
-        credentialPublicKey: isoBase64URL.fromBuffer(verification.registrationInfo.credentialPublicKey),
+        credentialID: credentialIDBase64,
+        credentialPublicKey: publicKeyBase64,
         counter: verification.registrationInfo.counter,
         transports: credential.response.transports || [],
         name: name || `Passkey ${(authData.passkeys?.length || 0) + 1}`,
@@ -406,15 +411,26 @@ app.post('/api/admin/auth/passkeys/login/options', async (req, res) => {
       return res.status(400).json({ error: 'No passkeys registered' })
     }
 
+    console.log('Passkeys found:', authData.passkeys.length)
+    authData.passkeys.forEach((pk, i) => {
+      console.log(`Passkey ${i}: credentialID type:`, typeof pk.credentialID,
+                  'isArray:', Array.isArray(pk.credentialID),
+                  'value:', pk.credentialID)
+    })
+
     const options = await generateAuthenticationOptions({
       rpID: rpID,
-      allowCredentials: authData.passkeys.map(passkey => ({
-        id: Array.isArray(passkey.credentialID)
+      allowCredentials: authData.passkeys.map(passkey => {
+        const credID = Array.isArray(passkey.credentialID)
           ? new Uint8Array(passkey.credentialID)
-          : isoBase64URL.toBuffer(passkey.credentialID),
-        type: 'public-key',
-        transports: passkey.transports,
-      })),
+          : isoBase64URL.toBuffer(passkey.credentialID)
+        console.log('Converted credentialID to:', credID)
+        return {
+          id: credID,
+          type: 'public-key',
+          transports: passkey.transports,
+        }
+      }),
       userVerification: 'preferred',
     })
 
