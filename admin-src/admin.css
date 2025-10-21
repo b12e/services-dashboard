@@ -272,19 +272,19 @@ button:disabled {
 }
 
 .info-banner {
-  background: #e7f3ff;
-  border: 1px solid #007bff;
+  background: rgba(74, 158, 255, 0.15);
+  border: 1px solid var(--accent-blue);
   padding: 0.75rem;
   border-radius: 4px;
   margin-bottom: 1rem;
-  color: #004085;
+  color: var(--accent-blue);
   font-size: 0.9rem;
 }
 
 .disabled-input {
-  background: #e9ecef !important;
+  background: var(--bg-tertiary) !important;
   cursor: not-allowed;
-  color: #6c757d;
+  color: var(--text-muted);
 }
 
 .empty-state {
@@ -422,15 +422,15 @@ button:disabled {
 }
 
 .validation-status.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background: rgba(40, 167, 69, 0.15);
+  color: #5cb85c;
+  border: 1px solid rgba(40, 167, 69, 0.3);
 }
 
 .validation-status.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b7a;
+  border: 1px solid rgba(220, 53, 69, 0.3);
 }
 
 .url-mode-toggle {
@@ -489,16 +489,18 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background: #e9ecef;
+  background: var(--bg-tertiary);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.875rem;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .category-tag .remove-tag {
   background: none;
   border: none;
-  color: #6c757d;
+  color: var(--text-secondary);
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
@@ -508,7 +510,7 @@ button:disabled {
 }
 
 .category-tag .remove-tag:hover {
-  color: #dc3545;
+  color: var(--accent-red);
 }
 
 /* Icon Autocomplete */
@@ -583,13 +585,13 @@ button:disabled {
 
 .icon-suggestion-name {
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
 .icon-suggestion-categories {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--text-secondary);
   margin-top: 0.25rem;
 }
 
@@ -604,7 +606,7 @@ button:disabled {
 .config-footer {
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-color);
 }
 
 /* Responsive */
@@ -960,13 +962,13 @@ button:disabled {
 }
 
 .category-badge.configured {
-  background: #cfe2ff;
-  color: #084298;
+  background: rgba(74, 158, 255, 0.2);
+  color: var(--accent-blue);
 }
 
 .category-badge.auto-detected {
-  background: #fff3cd;
-  color: #664d03;
+  background: rgba(255, 193, 7, 0.2);
+  color: var(--accent-yellow);
 }
 
 .category-status {
@@ -980,13 +982,13 @@ button:disabled {
 }
 
 .category-status.visible {
-  background: #d4edda;
-  color: #155724;
+  background: rgba(40, 167, 69, 0.2);
+  color: var(--accent-green);
 }
 
 .category-status.hidden {
-  background: #f8d7da;
-  color: #721c24;
+  background: rgba(220, 53, 69, 0.2);
+  color: var(--accent-red);
 }
 
 .category-actions {

@@ -377,11 +377,32 @@ app.post('/api/admin/auth/passkeys/register/verify', requireAuth, async (req, re
     if (verification.verified && verification.registrationInfo) {
       const authData = await loadAuthData()
 
-      // Store credentialID and publicKey as Base64URL strings for compatibility
-      const credentialIDBase64 = isoBase64URL.fromBuffer(verification.registrationInfo.credentialID)
-      const publicKeyBase64 = isoBase64URL.fromBuffer(verification.registrationInfo.credentialPublicKey)
+      // Debug: Log the entire registrationInfo structure
+      console.log('Full registrationInfo:', JSON.stringify(verification.registrationInfo, (key, value) => {
+        if (value instanceof Uint8Array) {
+          return `Uint8Array(${value.length})`
+        }
+        return value
+      }))
 
-      console.log('Storing passkey with credentialID type:', typeof credentialIDBase64, 'value:', credentialIDBase64)
+      // The credential ID and public key should be in these fields
+      const credentialID = verification.registrationInfo.credentialID
+      const credentialPublicKey = verification.registrationInfo.credentialPublicKey
+
+      console.log('credentialID:', credentialID, 'type:', typeof credentialID, 'isUint8Array:', credentialID instanceof Uint8Array)
+      console.log('credentialPublicKey:', credentialPublicKey, 'type:', typeof credentialPublicKey, 'isUint8Array:', credentialPublicKey instanceof Uint8Array)
+
+      // Convert to Base64URL strings
+      const credentialIDBase64 = credentialID instanceof Uint8Array
+        ? isoBase64URL.fromBuffer(credentialID)
+        : (typeof credentialID === 'string' ? credentialID : '')
+
+      const publicKeyBase64 = credentialPublicKey instanceof Uint8Array
+        ? isoBase64URL.fromBuffer(credentialPublicKey)
+        : (typeof credentialPublicKey === 'string' ? credentialPublicKey : '')
+
+      console.log('After conversion - credentialIDBase64:', credentialIDBase64, 'length:', credentialIDBase64.length)
+      console.log('After conversion - publicKeyBase64:', publicKeyBase64, 'length:', publicKeyBase64.length)
 
       const newPasskey = {
         credentialID: credentialIDBase64,
