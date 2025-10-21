@@ -27,8 +27,11 @@ function ServicesGrid({ services, baseUrl }) {
     )
   }
 
+  // Check if any services have descriptions
+  const hasDescriptions = services.some(service => service.description)
+
   return (
-    <div className="services-grid hide-urls">
+    <div className={`services-grid hide-urls ${hasDescriptions ? 'has-descriptions' : ''}`}>
       {services.map((service, index) => (
         <ServiceCard
           key={`${service.name}-${index}`}

@@ -466,6 +466,8 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
 
     console.log('Login attempt - credential.rawId:', credential.rawId, 'type:', typeof credential.rawId)
     console.log('Login attempt - credential.id:', credential.id, 'type:', typeof credential.id)
+    console.log('Login attempt - credential.response:', credential.response)
+    console.log('Login attempt - credential.type:', credential.type)
     console.log('Stored passkeys:', authData.passkeys?.map(p => ({ id: p.credentialID, name: p.name })))
 
     // credential.id is already a Base64URL string, use it directly
@@ -487,16 +489,26 @@ app.post('/api/admin/auth/passkeys/login/verify', async (req, res) => {
     console.log('CredentialID buffer length:', credentialIDBuffer.length)
     console.log('PublicKey buffer length:', publicKeyBuffer.length)
 
+    const authenticator = {
+      credentialID: credentialIDBuffer,
+      credentialPublicKey: publicKeyBuffer,
+      counter: passkey.counter,
+    }
+
+    console.log('Authenticator object:', {
+      credentialID: authenticator.credentialID.length + ' bytes',
+      credentialPublicKey: authenticator.credentialPublicKey.length + ' bytes',
+      counter: authenticator.counter,
+      hasTransports: !!passkey.transports,
+      transports: passkey.transports
+    })
+
     const verification = await verifyAuthenticationResponse({
       response: credential,
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: {
-        credentialID: credentialIDBuffer,
-        credentialPublicKey: publicKeyBuffer,
-        counter: passkey.counter,
-      },
+      authenticator: authenticator,
     })
 
     if (verification.verified) {
