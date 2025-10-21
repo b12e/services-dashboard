@@ -4,6 +4,7 @@ import ConfigManager from './components/ConfigManager'
 import LoginPage from './components/LoginPage'
 import PasskeyManager from './components/PasskeyManager'
 import CategoryManager from './components/CategoryManager'
+import { fetchWithCsrf, clearCsrfToken } from './utils/csrf'
 
 function AdminApp() {
   const [activeTab, setActiveTab] = useState('services')
@@ -58,7 +59,8 @@ function AdminApp() {
 
   async function handleLogout() {
     try {
-      await fetch('/api/admin/auth/logout', { method: 'POST' })
+      await fetchWithCsrf('/api/admin/auth/logout', { method: 'POST' })
+      clearCsrfToken() // Clear cached token on logout
       setAuthStatus(prev => ({ ...prev, authenticated: false }))
     } catch (err) {
       console.error('Logout failed:', err)

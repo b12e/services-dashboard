@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
+import { fetchWithCsrf } from '../utils/csrf'
 
 function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('')
@@ -33,7 +34,7 @@ function LoginPage({ onLogin }) {
     setError('')
 
     try {
-      const response = await fetch('/api/admin/auth/login', {
+      const response = await fetchWithCsrf('/api/admin/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

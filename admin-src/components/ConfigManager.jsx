@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithCsrf } from '../utils/csrf'
 
 function ConfigManager() {
   const [config, setConfig] = useState({
@@ -34,7 +35,7 @@ function ConfigManager() {
     setSaving(true)
     setValidationResults([])
     try {
-      const response = await fetch('/api/admin/config', {
+      const response = await fetchWithCsrf('/api/admin/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -108,7 +109,7 @@ function ConfigManager() {
       const formData = new FormData()
       formData.append('icon', file)
 
-      const response = await fetch('/api/admin/upload/icon', {
+      const response = await fetchWithCsrf('/api/admin/upload/icon', {
         method: 'POST',
         body: formData
       })

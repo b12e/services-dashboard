@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import IconAutocomplete from './IconAutocomplete'
+import { fetchWithCsrf } from '../utils/csrf'
 
 // Helper function to validate and sanitize icon names
 // Only allows alphanumeric characters, hyphens, underscores, and dots
@@ -50,7 +51,7 @@ function ServicesManager() {
 
   async function handleAdd(newService) {
     try {
-      const response = await fetch('/api/admin/services', {
+      const response = await fetchWithCsrf('/api/admin/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newService)
@@ -70,7 +71,7 @@ function ServicesManager() {
 
   async function handleUpdate(serviceId, updatedService) {
     try {
-      const response = await fetch(`/api/admin/services/${serviceId}`, {
+      const response = await fetchWithCsrf(`/api/admin/services/${serviceId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedService)
@@ -99,7 +100,7 @@ function ServicesManager() {
     }
 
     try {
-      const response = await fetch(`/api/admin/services/${serviceId}`, {
+      const response = await fetchWithCsrf(`/api/admin/services/${serviceId}`, {
         method: 'DELETE'
       })
 

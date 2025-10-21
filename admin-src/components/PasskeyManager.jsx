@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { startRegistration } from '@simplewebauthn/browser'
+import { fetchWithCsrf } from '../utils/csrf'
 
 function PasskeyManager() {
   const [passkeys, setPasskeys] = useState([])
@@ -37,7 +38,7 @@ function PasskeyManager() {
 
     try {
       // Get registration options
-      const optionsResponse = await fetch('/api/admin/auth/passkeys/register/options', {
+      const optionsResponse = await fetchWithCsrf('/api/admin/auth/passkeys/register/options', {
         method: 'POST'
       })
 
@@ -51,7 +52,7 @@ function PasskeyManager() {
       const credential = await startRegistration(options)
 
       // Verify registration
-      const verifyResponse = await fetch('/api/admin/auth/passkeys/register/verify', {
+      const verifyResponse = await fetchWithCsrf('/api/admin/auth/passkeys/register/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential, name: passkeyName })
@@ -79,7 +80,7 @@ function PasskeyManager() {
     }
 
     try {
-      const response = await fetch(`/api/admin/auth/passkeys/${index}`, {
+      const response = await fetchWithCsrf(`/api/admin/auth/passkeys/${index}`, {
         method: 'DELETE'
       })
 

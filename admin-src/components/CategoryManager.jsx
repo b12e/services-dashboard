@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithCsrf } from '../utils/csrf'
 
 function CategoryManager() {
   const [categories, setCategories] = useState([])
@@ -46,7 +47,7 @@ function CategoryManager() {
 
       config.categories = configuredCategories
 
-      const response = await fetch('/api/admin/config', {
+      const response = await fetchWithCsrf('/api/admin/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
