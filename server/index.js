@@ -392,6 +392,30 @@ app.get('/api/icons', async (req, res) => {
   }
 })
 
+// Helper function to validate and sanitize icon names
+// Only allows alphanumeric characters, hyphens, underscores, and dots
+// Prevents SSRF attacks by ensuring icon names can't be used to construct arbitrary URLs
+function sanitizeIconName(iconName) {
+  if (!iconName || typeof iconName !== 'string') {
+    return null
+  }
+
+  // Remove any characters that are not alphanumeric, dash, underscore, or dot
+  const sanitized = iconName.replace(/[^a-zA-Z0-9\-_.]/g, '')
+
+  // Prevent path traversal attacks
+  if (sanitized.includes('..') || sanitized.includes('./') || sanitized.includes('/.')) {
+    return null
+  }
+
+  // Ensure the sanitized name is not empty and has reasonable length
+  if (sanitized.length === 0 || sanitized.length > 100) {
+    return null
+  }
+
+  return sanitized
+}
+
 // Icon format cache - stores which icons exist in SVG vs PNG
 const iconFormatCache = new Map()
 
@@ -404,33 +428,39 @@ app.post('/api/icons/check-format', async (req, res) => {
       return res.status(400).json({ error: 'Icon name required' })
     }
 
-    // Check cache first
-    if (iconFormatCache.has(iconName)) {
-      return res.json(iconFormatCache.get(iconName))
+    // Sanitize the icon name to prevent SSRF attacks
+    const sanitizedIconName = sanitizeIconName(iconName)
+    if (!sanitizedIconName) {
+      return res.status(400).json({ error: 'Invalid icon name' })
     }
 
-    // Check if SVG exists
-    const svgUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`
+    // Check cache first using sanitized name
+    if (iconFormatCache.has(sanitizedIconName)) {
+      return res.json(iconFormatCache.get(sanitizedIconName))
+    }
+
+    // Check if SVG exists - use sanitized name to construct URL
+    const svgUrl = `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${sanitizedIconName}.svg`
     try {
       const svgResponse = await fetch(svgUrl, { method: 'HEAD' })
       const result = {
-        iconName,
+        iconName: sanitizedIconName,
         format: svgResponse.ok ? 'svg' : 'png',
         svgUrl: svgResponse.ok ? svgUrl : null,
-        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${sanitizedIconName}.png`
       }
 
-      iconFormatCache.set(iconName, result)
+      iconFormatCache.set(sanitizedIconName, result)
       return res.json(result)
     } catch (error) {
       // If fetch fails, assume PNG
       const result = {
-        iconName,
+        iconName: sanitizedIconName,
         format: 'png',
         svgUrl: null,
-        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+        pngUrl: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${sanitizedIconName}.png`
       }
-      iconFormatCache.set(iconName, result)
+      iconFormatCache.set(sanitizedIconName, result)
       return res.json(result)
     }
   } catch (error) {

@@ -121,7 +121,7 @@ const {
   doubleCsrfProtection, // This is the middleware
 } = doubleCsrf({
   getSecret: () => SESSION_SECRET, // Use the same secret as sessions
-  cookieName: '__Host-psifi.x-csrf-token',
+  cookieName: process.env.NODE_ENV === 'production' ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
   cookieOptions: {
     httpOnly: true,
     sameSite: 'strict',
@@ -143,6 +143,36 @@ const authRateLimiter = rateLimit({
   // Use a custom key generator to handle proxies correctly
   keyGenerator: (req) => {
     // Get the real IP address from headers (for reverse proxy support)
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+           req.headers['x-real-ip'] ||
+           req.ip
+  },
+})
+
+// Configure rate limiting for general API endpoints
+// More permissive than auth endpoints but still protected
+const apiRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 60, // Limit each IP to 60 requests per minute
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+           req.headers['x-real-ip'] ||
+           req.ip
+  },
+})
+
+// Configure rate limiting for write operations (POST, PUT, DELETE)
+// More restrictive to prevent abuse
+const writeRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 30, // Limit each IP to 30 write operations per minute
+  message: 'Too many write operations, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
            req.headers['x-real-ip'] ||
            req.ip
@@ -344,7 +374,7 @@ app.get('/api/admin/auth/passkeys/available', authRateLimiter, async (req, res) 
 })
 
 // Check if user has passkeys (authenticated endpoint for settings page)
-app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
+app.get('/api/admin/auth/passkeys/status', apiRateLimiter, requireAuth, async (req, res) => {
   const authData = await loadAuthData()
   res.json({
     hasPasskeys: authData.passkeys && authData.passkeys.length > 0,
@@ -353,7 +383,7 @@ app.get('/api/admin/auth/passkeys/status', requireAuth, async (req, res) => {
 })
 
 // Generate registration options for new passkey
-app.post('/api/admin/auth/passkeys/register/options', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.post('/api/admin/auth/passkeys/register/options', authRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
 
@@ -401,7 +431,7 @@ app.post('/api/admin/auth/passkeys/register/options', doubleCsrfProtection, requ
 })
 
 // Verify passkey registration
-app.post('/api/admin/auth/passkeys/register/verify', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.post('/api/admin/auth/passkeys/register/verify', authRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
     const { credential, name } = req.body
@@ -464,7 +494,8 @@ app.post('/api/admin/auth/passkeys/register/verify', doubleCsrfProtection, requi
 })
 
 // Generate authentication options for passkey login
-app.post('/api/admin/auth/passkeys/login/options', authRateLimiter, doubleCsrfProtection, async (req, res) => {
+// Note: CSRF protection not needed here - WebAuthn has built-in challenge/response security
+app.post('/api/admin/auth/passkeys/login/options', authRateLimiter, async (req, res) => {
   try {
     const { rpID } = getWebAuthnConfig(req)
     const authData = await loadAuthData()
@@ -492,7 +523,8 @@ app.post('/api/admin/auth/passkeys/login/options', authRateLimiter, doubleCsrfPr
 })
 
 // Verify passkey authentication
-app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, doubleCsrfProtection, async (req, res) => {
+// Note: CSRF protection not needed here - WebAuthn has built-in challenge/response security
+app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, async (req, res) => {
   try {
     const { rpID, origin } = getWebAuthnConfig(req)
     const { credential } = req.body
@@ -555,7 +587,7 @@ app.post('/api/admin/auth/passkeys/login/verify', authRateLimiter, doubleCsrfPro
 })
 
 // List passkeys
-app.get('/api/admin/auth/passkeys', requireAuth, async (req, res) => {
+app.get('/api/admin/auth/passkeys', apiRateLimiter, requireAuth, async (req, res) => {
   try {
     const authData = await loadAuthData()
     const passkeys = (authData.passkeys || []).map(p => ({
@@ -570,7 +602,7 @@ app.get('/api/admin/auth/passkeys', requireAuth, async (req, res) => {
 })
 
 // Delete passkey
-app.delete('/api/admin/auth/passkeys/:index', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.delete('/api/admin/auth/passkeys/:index', writeRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const index = parseInt(req.params.index)
     const authData = await loadAuthData()
@@ -626,7 +658,7 @@ async function fetchNPMServicesForAdmin() {
 }
 
 // GET /api/admin/services - Get all services (NPM + manual + overrides)
-app.get('/api/admin/services', requireAuth, async (req, res) => {
+app.get('/api/admin/services', apiRateLimiter, requireAuth, async (req, res) => {
   try {
     const config = await fs.readFile(CONFIG_PATH, 'utf-8').then(d => JSON.parse(d)).catch(() => ({}))
     const { manualServices, overrides } = await loadServicesData()
@@ -672,7 +704,7 @@ app.get('/api/admin/services', requireAuth, async (req, res) => {
 })
 
 // POST /api/admin/services - Add a new manual service
-app.post('/api/admin/services', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.post('/api/admin/services', writeRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const newService = req.body
     const { manualServices, overrides } = await loadServicesData()
@@ -692,7 +724,7 @@ app.post('/api/admin/services', doubleCsrfProtection, requireAuth, async (req, r
 })
 
 // PUT /api/admin/services/:id - Update a service or create/update override
-app.put('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.put('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const serviceId = req.params.id
     const updatedData = req.body
@@ -729,7 +761,7 @@ app.put('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (req
 })
 
 // DELETE /api/admin/services/:id - Delete a service or remove override
-app.delete('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.delete('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const serviceId = req.params.id
     const { manualServices, overrides } = await loadServicesData()
@@ -759,7 +791,7 @@ app.delete('/api/admin/services/:id', doubleCsrfProtection, requireAuth, async (
 })
 
 // GET /api/admin/categories - Get all categories (configured + auto-detected)
-app.get('/api/admin/categories', requireAuth, async (req, res) => {
+app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) => {
   try {
     // Load config for configured categories
     const configData = await fs.readFile(CONFIG_PATH, 'utf-8')
@@ -839,7 +871,7 @@ app.get('/api/branding', async (req, res) => {
 })
 
 // GET /api/admin/config - Get configuration
-app.get('/api/admin/config', requireAuth, async (req, res) => {
+app.get('/api/admin/config', apiRateLimiter, requireAuth, async (req, res) => {
   try {
     const data = await fs.readFile(CONFIG_PATH, 'utf-8')
     const config = JSON.parse(data)
@@ -851,7 +883,7 @@ app.get('/api/admin/config', requireAuth, async (req, res) => {
 })
 
 // PUT /api/admin/config - Update configuration
-app.put('/api/admin/config', doubleCsrfProtection, requireAuth, async (req, res) => {
+app.put('/api/admin/config', writeRateLimiter, doubleCsrfProtection, requireAuth, async (req, res) => {
   try {
     const config = req.body
 
@@ -899,7 +931,7 @@ app.put('/api/admin/config', doubleCsrfProtection, requireAuth, async (req, res)
 })
 
 // Upload custom icon
-app.post('/api/admin/upload/icon', doubleCsrfProtection, requireAuth, upload.single('icon'), async (req, res) => {
+app.post('/api/admin/upload/icon', writeRateLimiter, doubleCsrfProtection, requireAuth, upload.single('icon'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' })
@@ -921,7 +953,8 @@ app.post('/api/admin/upload/icon', doubleCsrfProtection, requireAuth, upload.sin
 app.use('/uploads', express.static(UPLOADS_DIR))
 
 // Serve admin UI for all other routes
-app.get('*', (req, res) => {
+// Apply rate limiting to prevent abuse of file system access
+app.get('*', apiRateLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-dist', 'index.html'))
 })
 
