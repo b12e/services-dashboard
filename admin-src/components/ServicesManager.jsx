@@ -2,24 +2,6 @@ import { useState, useEffect } from 'react'
 import IconAutocomplete from './IconAutocomplete'
 import { fetchWithCsrf } from '../utils/csrf'
 
-// Helper function to validate and sanitize icon names
-// Only allows alphanumeric characters, hyphens, underscores, and dots
-function sanitizeIconName(iconName) {
-  if (!iconName || typeof iconName !== 'string') {
-    return ''
-  }
-
-  // Remove any characters that are not alphanumeric, dash, underscore, or dot
-  const sanitized = iconName.replace(/[^a-zA-Z0-9\-_.]/g, '')
-
-  // Prevent path traversal attacks
-  if (sanitized.includes('..') || sanitized.includes('./') || sanitized.includes('/.')) {
-    return ''
-  }
-
-  return sanitized
-}
-
 function ServicesManager() {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -272,17 +254,17 @@ function ServicesManager() {
             </thead>
             <tbody>
               {filteredAndSortedServices.map((service) => {
-                // Sanitize the icon name before rendering
-                const sanitizedIcon = sanitizeIconName(service.icon)
                 return (
                   <tr key={service._id} className={service.hidden ? 'hidden-service' : ''}>
                     <td className="icon-cell">
-                      {sanitizedIcon && (
+                      {service.iconUrl ? (
                         <img
-                          src={`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${sanitizedIcon}.svg`}
+                          src={service.iconUrl}
                           alt=""
                           onError={(e) => e.target.style.display = 'none'}
                         />
+                      ) : service.fallbackInitials && (
+                        <div className="icon-fallback">{service.fallbackInitials}</div>
                       )}
                   </td>
                   <td className="name-cell">{service.name}</td>

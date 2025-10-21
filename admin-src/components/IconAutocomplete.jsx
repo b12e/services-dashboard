@@ -34,6 +34,8 @@ function IconAutocomplete({ value, onChange, placeholder }) {
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [iconPreviewUrl, setIconPreviewUrl] = useState(null)
+  const [iconPreviewCache, setIconPreviewCache] = useState(new Map())
   const wrapperRef = useRef(null)
 
   useEffect(() => {
@@ -42,7 +44,37 @@ function IconAutocomplete({ value, onChange, placeholder }) {
 
   useEffect(() => {
     setInputValue(value || '')
+    if (value) {
+      loadIconPreview(value)
+    }
   }, [value])
+
+  async function loadIconPreview(iconName) {
+    if (!iconName) {
+      setIconPreviewUrl(null)
+      return
+    }
+
+    // Check cache first
+    if (iconPreviewCache.has(iconName)) {
+      setIconPreviewUrl(iconPreviewCache.get(iconName))
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/icons/preview/${encodeURIComponent(iconName)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setIconPreviewUrl(data.url)
+        setIconPreviewCache(new Map(iconPreviewCache).set(iconName, data.url))
+      } else {
+        setIconPreviewUrl(null)
+      }
+    } catch (error) {
+      console.error('Failed to load icon preview:', error)
+      setIconPreviewUrl(null)
+    }
+  }
 
   useEffect(() => {
     // Close suggestions when clicking outside
@@ -73,6 +105,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     const newValue = e.target.value
     setInputValue(newValue)
     onChange(newValue)
+    loadIconPreview(newValue)
 
     if (newValue.length >= 1) {
       const filtered = icons.filter(icon => {

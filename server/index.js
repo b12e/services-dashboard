@@ -8,6 +8,7 @@ import { readFile } from 'fs/promises'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { categorizeService } from './categorize.js'
+import { resolveServiceIcon, resolveIconUrl } from './icon-resolver.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -392,6 +393,23 @@ app.get('/api/icons', async (req, res) => {
   }
 })
 
+// API endpoint to get icon preview URL
+app.get('/api/icons/preview/:iconName', async (req, res) => {
+  try {
+    const { iconName } = req.params
+    const iconResult = await resolveIconUrl(iconName)
+
+    if (iconResult) {
+      res.json(iconResult)
+    } else {
+      res.status(404).json({ error: 'Icon not found' })
+    }
+  } catch (error) {
+    console.error('Failed to get icon preview:', error)
+    res.status(500).json({ error: 'Failed to get icon preview' })
+  }
+})
+
 // Helper function to validate and sanitize icon names
 // Only allows alphanumeric characters, hyphens, underscores, and dots
 // Prevents SSRF attacks by ensuring icon names can't be used to construct arbitrary URLs
@@ -543,7 +561,18 @@ async function getAllVisibleServices() {
     }
   })
 
-  return categorizedServices
+  // Resolve icons for all services
+  const servicesWithIcons = await Promise.all(
+    categorizedServices.map(async (service) => {
+      const iconInfo = await resolveServiceIcon(service)
+      return {
+        ...service,
+        ...iconInfo
+      }
+    })
+  )
+
+  return servicesWithIcons
 }
 
 // Helper function to extract categories from services

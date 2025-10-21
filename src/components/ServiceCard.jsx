@@ -36,30 +36,18 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
   const shouldAppendBase = service.appendBaseDomain !== false
   const urlResult = validateAndNormalizeUrl(service.url, shouldAppendBase, baseUrl)
 
-  const iconText = service.name
+  // Use fallback initials from API or generate them
+  const iconText = service.fallbackInitials || service.name
     .split(' ')
     .map(word => word[0])
     .join('')
     .substring(0, 2)
     .toUpperCase()
 
-  // Check if icon is a custom URL (starts with http:// or https://)
-  const isCustomIconUrl = service.icon && (service.icon.startsWith('http://') || service.icon.startsWith('https://'))
-
-  const iconName = service.icon || service.name.toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-
-  // If custom URL, use it directly; otherwise use dashboard-icons CDN
-  const svgUrl = isCustomIconUrl
-    ? service.icon
-    : `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`
-  const pngUrl = isCustomIconUrl
-    ? service.icon
-    : `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`
+  // Use icon URL from API if available
+  const iconUrl = service.iconUrl
 
   const [imageError, setImageError] = useState(false)
-  const [usePng, setUsePng] = useState(false)
 
   if (!urlResult.valid) {
     return (
@@ -93,14 +81,8 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
   }
 
   const handleImageError = () => {
-    // If custom URL, skip PNG fallback and go straight to initials
-    if (isCustomIconUrl) {
-      setImageError(true)
-    } else if (!usePng) {
-      setUsePng(true)
-    } else {
-      setImageError(true)
-    }
+    // Icon URL from API failed, show initials fallback
+    setImageError(true)
   }
 
   return (
@@ -113,16 +95,16 @@ function ServiceCard({ service, baseUrl, animationDelay }) {
       style={{ animationDelay: `${animationDelay}s` }}
     >
       <div className="service-icon">
-        {!imageError && (
+        {!imageError && iconUrl && (
           <img
-            src={usePng ? pngUrl : svgUrl}
+            src={iconUrl}
             alt={`${service.name} icon`}
             onError={handleImageError}
           />
         )}
         <span
           className="fallback-text"
-          style={{ display: imageError ? 'block' : 'none' }}
+          style={{ display: imageError || !iconUrl ? 'block' : 'none' }}
         >
           {iconText}
         </span>
@@ -143,6 +125,8 @@ ServiceCard.propTypes = {
     name: PropTypes.string.isRequired,
     url: PropTypes.string,
     icon: PropTypes.string,
+    iconUrl: PropTypes.string,
+    fallbackInitials: PropTypes.string,
     description: PropTypes.string,
     appendBaseDomain: PropTypes.bool
   }).isRequired,

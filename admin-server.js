@@ -15,6 +15,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
+import { resolveServiceIcon } from './server/icon-resolver.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -134,7 +135,7 @@ if (!SESSION_SECRET) {
   CSRF_SECRET = SESSION_SECRET
 }
 
-console.log('🔐 Initializing CSRF protection with secret length:', CSRF_SECRET.length)
+console.log('🔐 Initializing CSRF protection with length valid?', !!(CSRF_SECRET.length >= 32))
 
 const csrfProtection = doubleCsrf({
   getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
@@ -739,7 +740,18 @@ app.get('/api/admin/services', apiRateLimiter, requireAuth, async (req, res) => 
       })
     }
 
-    res.json(allServices)
+    // Resolve icons for all services
+    const servicesWithIcons = await Promise.all(
+      allServices.map(async (service) => {
+        const iconInfo = await resolveServiceIcon(service)
+        return {
+          ...service,
+          ...iconInfo
+        }
+      })
+    )
+
+    res.json(servicesWithIcons)
   } catch (error) {
     console.error('Error reading services:', error)
     res.status(500).json({ error: 'Failed to read services' })
