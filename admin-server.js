@@ -136,10 +136,7 @@ if (!SESSION_SECRET) {
 
 console.log('🔐 Initializing CSRF protection with secret length:', CSRF_SECRET.length)
 
-const {
-  generateToken, // Use this to create a CSRF token
-  doubleCsrfProtection, // This is the middleware
-} = doubleCsrf({
+const csrfProtection = doubleCsrf({
   getSecret: () => CSRF_SECRET, // Use padded secret (min 32 chars required)
   cookieName: process.env.NODE_ENV === 'production' ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
   cookieOptions: {
@@ -152,6 +149,9 @@ const {
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
   getTokenFromRequest: (req) => req.headers['x-csrf-token'], // Read token from header
 })
+
+const generateToken = csrfProtection.generateCsrfToken
+const doubleCsrfProtection = csrfProtection.doubleCsrfProtection
 
 // Configure rate limiting for authentication endpoints
 const authRateLimiter = rateLimit({
