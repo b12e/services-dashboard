@@ -325,13 +325,13 @@ function requireAuth(req, res, next) {
 }
 
 // Public endpoint to get CSRF token
-app.get('/api/admin/csrf-token', (req, res) => {
+app.get('/api/admin/csrf-token', apiRateLimiter, (req, res) => {
   const csrfToken = generateToken(req, res)
   res.json({ csrfToken })
 })
 
 // Public endpoint to check auth status
-app.get('/api/admin/auth/status', (req, res) => {
+app.get('/api/admin/auth/status', apiRateLimiter, (req, res) => {
   res.json({
     authRequired: AUTH_REQUIRED,
     authenticated: AUTH_REQUIRED ? !!req.session?.authenticated : true,
@@ -356,7 +356,7 @@ app.post('/api/admin/auth/login', authRateLimiter, doubleCsrfProtection, async (
 })
 
 // Logout
-app.post('/api/admin/auth/logout', doubleCsrfProtection, (req, res) => {
+app.post('/api/admin/auth/logout', apiRateLimiter, doubleCsrfProtection, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to logout' })
@@ -854,7 +854,7 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
 })
 
 // GET /api/branding - Get custom name and icon (public endpoint)
-app.get('/api/branding', async (req, res) => {
+app.get('/api/branding', apiRateLimiter, async (req, res) => {
   try {
     const data = await fs.readFile(CONFIG_PATH, 'utf-8')
     const config = JSON.parse(data)
