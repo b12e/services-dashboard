@@ -1,6 +1,12 @@
 /**
  * Category Management Module
  * Manages categories in a separate file with ID-based references
+ *
+ * Race Condition Prevention:
+ * - Uses in-memory cache to reduce file reads
+ * - Batches writes with 100ms debounce window
+ * - convertNamesToIds() processes all names in a single read-modify-write cycle
+ * - Cache updated immediately to prevent duplicate category creation during parallel operations
  */
 
 import fs from 'fs/promises'
@@ -9,6 +15,13 @@ import crypto from 'crypto'
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data')
 const CATEGORIES_PATH = path.join(DATA_DIR, 'categories.json')
+
+// In-memory cache and pending operations queue
+let categoriesCache = null
+let cacheTimestamp = null
+let pendingWrites = []
+let writeTimer = null
+const WRITE_DELAY_MS = 100 // Batch writes within 100ms window
 
 /**
  * Generate a unique category ID
@@ -25,9 +38,14 @@ function normalizeCategoryName(name) {
 }
 
 /**
- * Load categories from file
+ * Load categories from file with caching
  */
-export async function loadCategories() {
+export async function loadCategories(forceReload = false) {
+  // Return cached version if available and fresh
+  if (categoriesCache && !forceReload && cacheTimestamp && (Date.now() - cacheTimestamp < 5000)) {
+    return [...categoriesCache] // Return copy to prevent mutations
+  }
+
   try {
     const data = await fs.readFile(CATEGORIES_PATH, 'utf-8')
     const categories = JSON.parse(data)
@@ -35,22 +53,29 @@ export async function loadCategories() {
     // Ensure it's an array
     if (!Array.isArray(categories)) {
       console.warn('Categories file is not an array, returning empty array')
+      categoriesCache = []
+      cacheTimestamp = Date.now()
       return []
     }
 
-    return categories
+    categoriesCache = categories
+    cacheTimestamp = Date.now()
+    return [...categories] // Return copy
   } catch (error) {
     if (error.code === 'ENOENT') {
       // File doesn't exist, return empty array
+      categoriesCache = []
+      cacheTimestamp = Date.now()
       return []
     }
     console.error('Error loading categories:', error)
-    return []
+    return categoriesCache ? [...categoriesCache] : []
   }
 }
 
 /**
- * Save categories to file
+ * Save categories to file with batching
+ * Debounces writes to prevent concurrent file corruption
  */
 export async function saveCategories(categories) {
   try {
@@ -63,11 +88,46 @@ export async function saveCategories(categories) {
     }
 
     await fs.writeFile(CATEGORIES_PATH, JSON.stringify(categories, null, 2))
+
+    // Update cache
+    categoriesCache = [...categories]
+    cacheTimestamp = Date.now()
+
     return true
   } catch (error) {
     console.error('Error saving categories:', error)
     throw error
   }
+}
+
+/**
+ * Schedule a batched write operation
+ * This prevents concurrent writes by batching operations within a time window
+ */
+function scheduleBatchedWrite(categories) {
+  return new Promise((resolve, reject) => {
+    // Clear existing timer
+    if (writeTimer) {
+      clearTimeout(writeTimer)
+    }
+
+    // Update the pending categories
+    categoriesCache = [...categories]
+
+    // Schedule write after delay
+    writeTimer = setTimeout(async () => {
+      try {
+        await saveCategories(categoriesCache)
+        writeTimer = null
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    }, WRITE_DELAY_MS)
+
+    // Also resolve immediately since write is scheduled
+    resolve()
+  })
 }
 
 /**
@@ -90,6 +150,7 @@ export async function getCategoryByName(name) {
 /**
  * Get or create category by name
  * Returns the category ID
+ * Uses cache to prevent duplicate creation during parallel operations
  */
 export async function getOrCreateCategory(name, options = {}) {
   const {
@@ -99,14 +160,17 @@ export async function getOrCreateCategory(name, options = {}) {
     source = 'auto'
   } = options
 
-  // Check if category already exists
-  const existing = await getCategoryByName(name)
+  // Load from cache first to reduce file reads
+  const categories = await loadCategories()
+  const normalizedName = normalizeCategoryName(name)
+
+  // Check if category already exists (in cache or file)
+  const existing = categories.find(cat => normalizeCategoryName(cat.name) === normalizedName)
   if (existing) {
     return existing.id
   }
 
   // Create new category
-  const categories = await loadCategories()
   const newCategory = {
     id: generateCategoryId(),
     name: name.trim(),
@@ -118,7 +182,12 @@ export async function getOrCreateCategory(name, options = {}) {
   }
 
   categories.push(newCategory)
-  await saveCategories(categories)
+
+  // Update cache immediately to prevent duplicate creation
+  categoriesCache = [...categories]
+
+  // Schedule batched write
+  await scheduleBatchedWrite(categories)
 
   return newCategory.id
 }
@@ -142,7 +211,8 @@ export async function updateCategory(id, updates) {
     updatedAt: new Date().toISOString()
   }
 
-  await saveCategories(categories)
+  categoriesCache = [...categories]
+  await scheduleBatchedWrite(categories)
   return categories[index]
 }
 
@@ -159,7 +229,8 @@ export async function deleteCategory(id) {
     return false // Category not found
   }
 
-  await saveCategories(filtered)
+  categoriesCache = [...filtered]
+  await scheduleBatchedWrite(filtered)
   return true
 }
 
@@ -189,15 +260,55 @@ export async function getCategoryIdToNameMap() {
 
 /**
  * Convert category names to IDs
+ * Batched version that minimizes file I/O
  */
 export async function convertNamesToIds(names) {
-  if (!Array.isArray(names)) return []
+  if (!Array.isArray(names) || names.length === 0) return []
+
+  // Load categories once
+  const categories = await loadCategories()
+  const normalizedMap = new Map()
+
+  // Build normalized name lookup
+  categories.forEach(cat => {
+    normalizedMap.set(normalizeCategoryName(cat.name), cat.id)
+  })
 
   const ids = []
+  const newCategories = []
+
+  // Process all names
   for (const name of names) {
-    const id = await getOrCreateCategory(name)
-    ids.push(id)
+    const normalized = normalizeCategoryName(name)
+
+    // Check if exists
+    if (normalizedMap.has(normalized)) {
+      ids.push(normalizedMap.get(normalized))
+    } else {
+      // Create new category
+      const newCategory = {
+        id: generateCategoryId(),
+        name: name.trim(),
+        displayName: name.trim(),
+        visible: true,
+        configured: false,
+        source: 'auto',
+        createdAt: new Date().toISOString()
+      }
+
+      newCategories.push(newCategory)
+      categories.push(newCategory)
+      normalizedMap.set(normalized, newCategory.id)
+      ids.push(newCategory.id)
+    }
   }
+
+  // If we created new categories, write once
+  if (newCategories.length > 0) {
+    categoriesCache = [...categories]
+    await scheduleBatchedWrite(categories)
+  }
+
   return ids
 }
 

@@ -36,6 +36,10 @@ lerna-debug.log*
 # Backup files
 .backup/
 
+# Markdown files (except README.md)
+*.md
+!README.md
+
 # Local configuration (optional - remove if you want to commit these)
 services.json
 configuration.json

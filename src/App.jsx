@@ -272,9 +272,6 @@ function App() {
         <div className="error">
           <h2>Failed to load services</h2>
           <p>{error}</p>
-          <p style={{ fontSize: '0.875rem', marginTop: '1rem' }}>
-            Make sure services.json is in the public directory.
-          </p>
         </div>
       </div>
     )

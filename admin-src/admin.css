@@ -721,6 +721,7 @@ button:disabled {
   white-space: nowrap;
 }
 
+.icon-source-select,
 .icon-category-select {
   padding: 0.625rem 0.875rem;
   background: var(--bg-input);
@@ -733,6 +734,7 @@ button:disabled {
   min-width: 150px;
 }
 
+.icon-source-select:focus,
 .icon-category-select:focus {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
@@ -861,6 +863,31 @@ button:disabled {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-source-badge {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: var(--accent-blue);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 600;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.icon-grid-slug {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: 'Monaco', 'Courier New', monospace;
+  margin-top: 0.125rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

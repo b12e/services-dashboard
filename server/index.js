@@ -116,6 +116,9 @@ let iconsMetadata = null
 async function loadIconsMetadata() {
   if (iconsMetadata) return iconsMetadata
 
+  const allIcons = []
+
+  // Load dashboard-icons metadata
   try {
     const metadataPath = join(distPath, 'dashboard-icons-metadata.json')
     const text = await readFile(metadataPath, 'utf-8')
@@ -123,27 +126,51 @@ async function loadIconsMetadata() {
 
     // Convert object to array if needed (metadata is an object with icon names as keys)
     if (data && typeof data === 'object' && !Array.isArray(data)) {
-      iconsMetadata = Object.entries(data).map(([name, metadata]) => ({
+      const dashboardIcons = Object.entries(data).map(([name, metadata]) => ({
         name,
+        source: 'dashboard-icons',
         ...metadata
       }))
-    } else {
-      iconsMetadata = Array.isArray(data) ? data : []
+      allIcons.push(...dashboardIcons)
+    } else if (Array.isArray(data)) {
+      allIcons.push(...data.map(icon => ({ ...icon, source: 'dashboard-icons' })))
     }
 
-    if (iconsMetadata.length === 0) {
-      console.warn('WARNING: Icons metadata is empty! No icons will be auto-detected.')
-      console.warn('Check that /app/dist/dashboard-icons-metadata.json exists and is valid.')
-    } else {
-      console.log(`✓ Loaded metadata for ${iconsMetadata.length} icons`)
-    }
-    return iconsMetadata
+    console.log(`✓ Loaded ${allIcons.length} dashboard icons`)
   } catch (error) {
-    console.error('ERROR loading icons metadata:', error.message)
-    console.error('Path attempted:', join(distPath, 'dashboard-icons-metadata.json'))
-    iconsMetadata = []
-    return []
+    console.warn('WARNING: Could not load dashboard-icons metadata:', error.message)
   }
+
+  // Load simple-icons metadata
+  try {
+    const simpleIconsPath = join(__dirname, '../node_modules/simple-icons/data/simple-icons.json')
+    const simpleText = await readFile(simpleIconsPath, 'utf-8')
+    const simpleData = JSON.parse(simpleText)
+
+    if (Array.isArray(simpleData)) {
+      const simpleIcons = simpleData.map(icon => ({
+        name: icon.slug,
+        title: icon.title,
+        source: 'simple-icons',
+        categories: [], // Simple-icons doesn't have categories in metadata
+        aliases: icon.aliases?.aka || []
+      }))
+      allIcons.push(...simpleIcons)
+      console.log(`✓ Loaded ${simpleIcons.length} simple-icons`)
+    }
+  } catch (error) {
+    console.warn('WARNING: Could not load simple-icons metadata:', error.message)
+  }
+
+  iconsMetadata = allIcons
+
+  if (iconsMetadata.length === 0) {
+    console.warn('WARNING: No icons metadata loaded!')
+  } else {
+    console.log(`✓ Total icons available: ${iconsMetadata.length}`)
+  }
+
+  return iconsMetadata
 }
 
 /**

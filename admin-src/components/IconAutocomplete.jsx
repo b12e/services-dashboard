@@ -43,6 +43,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
   const [showModal, setShowModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedSource, setSelectedSource] = useState('all')
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [categories, setCategories] = useState([])
   const [filteredIcons, setFilteredIcons] = useState([])
@@ -122,7 +123,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     }
   }
 
-  // Filter icons based on search and category
+  // Filter icons based on search, category, and source
   useEffect(() => {
     let filtered = icons
 
@@ -131,6 +132,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
       const search = searchTerm.toLowerCase()
       filtered = filtered.filter(icon => {
         return icon.name.toLowerCase().includes(search) ||
+               (icon.title && icon.title.toLowerCase().includes(search)) ||
                (icon.aliases && icon.aliases.some(alias => alias.toLowerCase().includes(search))) ||
                (icon.categories && icon.categories.some(cat => cat.toLowerCase().includes(search)))
       })
@@ -143,8 +145,13 @@ function IconAutocomplete({ value, onChange, placeholder }) {
       )
     }
 
+    // Filter by source
+    if (selectedSource !== 'all') {
+      filtered = filtered.filter(icon => icon.source === selectedSource)
+    }
+
     setFilteredIcons(filtered.slice(0, 100)) // Limit to 100 for performance
-  }, [icons, searchTerm, selectedCategory])
+  }, [icons, searchTerm, selectedCategory, selectedSource])
 
   function handleInputChange(e) {
     const newValue = e.target.value
@@ -164,6 +171,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     setShowModal(true)
     setSearchTerm('')
     setSelectedCategory('all')
+    setSelectedSource('all')
   }
 
   function closeModal() {
@@ -221,6 +229,19 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                   className="icon-search-input"
                   autoFocus
                 />
+              </div>
+
+              <div className="icon-filter-group">
+                <label>Source:</label>
+                <select
+                  value={selectedSource}
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                  className="icon-source-select"
+                >
+                  <option value="all">All Sources</option>
+                  <option value="dashboard-icons">Dashboard Icons ({icons.filter(i => i.source === 'dashboard-icons').length})</option>
+                  <option value="simple-icons">Simple Icons ({icons.filter(i => i.source === 'simple-icons').length})</option>
+                </select>
               </div>
 
               <div className="icon-filter-group">
@@ -285,7 +306,13 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                       </div>
                       {viewMode === 'list' && (
                         <div className="icon-grid-info">
-                          <div className="icon-grid-name">{icon.name}</div>
+                          <div className="icon-grid-name">
+                            {icon.title || icon.name}
+                            {icon.source && (
+                              <span className="icon-source-badge">{icon.source === 'simple-icons' ? 'SI' : 'DI'}</span>
+                            )}
+                          </div>
+                          <div className="icon-grid-slug">{icon.name}</div>
                           {icon.categories && icon.categories.length > 0 && (
                             <div className="icon-grid-categories">
                               {icon.categories.slice(0, 2).join(', ')}
