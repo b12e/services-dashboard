@@ -82,12 +82,13 @@ jobs:
 
       # Sync README.md to Docker Hub when merging to main
       # This ensures the Docker Hub description stays up-to-date with the GitHub README
+      # Requires DOCKERHUB_TOKEN to be a Personal Access Token with Read/Write permissions
       - name: Update Docker Hub README
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE_NAME }}
           readme-filepath: ./README.md
 
