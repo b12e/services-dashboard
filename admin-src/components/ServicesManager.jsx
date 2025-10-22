@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import IconAutocomplete from './IconAutocomplete'
 import { fetchWithCsrf } from '../utils/csrf'
 

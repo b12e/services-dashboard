@@ -853,18 +853,16 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
     const config = JSON.parse(configData)
     const configuredCategories = config.categories || []
 
-    // Load services to find auto-detected categories
-    const { manualServices, overrides } = await loadServicesData()
-
-    // Also load NPM services to get their auto-detected categories
-    let npmServices = []
+    // Get all services with their actual categories from the main server
+    // This includes auto-detected categories from categorize.js and icon metadata
+    let allServices = []
     try {
-      const npmResponse = await fetch('http://localhost:3001/api/services/npm')
-      if (npmResponse.ok) {
-        npmServices = await npmResponse.json()
+      const servicesResponse = await fetch('http://localhost:3000/api/services')
+      if (servicesResponse.ok) {
+        allServices = await servicesResponse.json()
       }
     } catch (error) {
-      // NPM services might not be available
+      console.error('Failed to fetch services from main server:', error)
     }
 
     const allCategoryNames = new Set()
@@ -872,8 +870,8 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
     // Count services per category
     const categoryCounts = new Map()
 
-    // Extract and count categories from manual services
-    manualServices.forEach(service => {
+    // Extract and count categories from all services (includes auto-detected)
+    allServices.forEach(service => {
       if (Array.isArray(service.categories)) {
         service.categories.forEach(cat => {
           allCategoryNames.add(cat)
@@ -882,33 +880,6 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
       } else if (service.category) {
         allCategoryNames.add(service.category)
         categoryCounts.set(service.category, (categoryCounts.get(service.category) || 0) + 1)
-      }
-    })
-
-    // Extract and count categories from overrides
-    Object.values(overrides).forEach(override => {
-      if (Array.isArray(override.categories)) {
-        override.categories.forEach(cat => {
-          allCategoryNames.add(cat)
-          categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
-        })
-      } else if (override.category) {
-        allCategoryNames.add(override.category)
-        categoryCounts.set(override.category, (categoryCounts.get(override.category) || 0) + 1)
-      }
-    })
-
-    // Extract and count auto-detected categories from NPM services (from icon metadata)
-    npmServices.forEach(service => {
-      if (Array.isArray(service._suggestedCategories) && service._suggestedCategories.length > 0) {
-        // Only count if service doesn't already have manually set categories
-        const hasManualCategories = overrides[service._id]?.categories
-        if (!hasManualCategories) {
-          service._suggestedCategories.forEach(cat => {
-            allCategoryNames.add(cat)
-            categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
-          })
-        }
       }
     })
 
@@ -944,6 +915,83 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
   } catch (error) {
     console.error('Error loading categories:', error)
     res.status(500).json({ error: 'Failed to load categories' })
+  }
+})
+
+// POST /api/admin/categories/delete - Delete a category from all services
+app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, verifyCsrfToken, async (req, res) => {
+  try {
+    const { categoryName } = req.body
+
+    if (!categoryName) {
+      return res.status(400).json({ error: 'Category name is required' })
+    }
+
+    // Load services data
+    const { manualServices, overrides } = await loadServicesData()
+
+    // Remove category from manual services
+    let manualServicesChanged = false
+    manualServices.forEach(service => {
+      if (Array.isArray(service.categories)) {
+        const originalLength = service.categories.length
+        service.categories = service.categories.filter(cat => cat !== categoryName)
+        if (service.categories.length !== originalLength) {
+          manualServicesChanged = true
+        }
+        // If no categories left, remove the field
+        if (service.categories.length === 0) {
+          delete service.categories
+        }
+      }
+      // Also handle old single category field
+      if (service.category === categoryName) {
+        delete service.category
+        manualServicesChanged = true
+      }
+    })
+
+    // Remove category from overrides
+    let overridesChanged = false
+    Object.values(overrides).forEach(override => {
+      if (Array.isArray(override.categories)) {
+        const originalLength = override.categories.length
+        override.categories = override.categories.filter(cat => cat !== categoryName)
+        if (override.categories.length !== originalLength) {
+          overridesChanged = true
+        }
+        // If no categories left, remove the field
+        if (override.categories.length === 0) {
+          delete override.categories
+        }
+      }
+      // Also handle old single category field
+      if (override.category === categoryName) {
+        delete override.category
+        overridesChanged = true
+      }
+    })
+
+    // Save changes if any were made
+    if (manualServicesChanged || overridesChanged) {
+      await saveServicesData({ manualServices, overrides })
+    }
+
+    // Also remove from configured categories in config
+    const configData = await fs.readFile(CONFIG_PATH, 'utf-8')
+    const config = JSON.parse(configData)
+    if (config.categories) {
+      const originalLength = config.categories.length
+      config.categories = config.categories.filter(cat => cat.name !== categoryName)
+      if (config.categories.length !== originalLength) {
+        await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+      }
+    }
+
+    res.json({ success: true, message: 'Category deleted from all services' })
+  } catch (error) {
+    console.error('Error deleting category:', error)
+    res.status(500).json({ error: 'Failed to delete category' })
   }
 })
 

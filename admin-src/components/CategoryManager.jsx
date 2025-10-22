@@ -118,13 +118,34 @@ function CategoryManager() {
     setEditName('')
   }
 
-  function handleDeleteCategory(index) {
-    if (!confirm(`Are you sure you want to delete the category "${categories[index].displayName}"?`)) {
+  async function handleDeleteCategory(index) {
+    const categoryToDelete = categories[index]
+
+    if (!confirm(`Are you sure you want to delete the category "${categoryToDelete.displayName}"?\n\nThis will remove it from ${categoryToDelete.serviceCount || 0} service(s).`)) {
       return
     }
 
-    const updatedCategories = categories.filter((_, i) => i !== index)
-    saveCategories(updatedCategories)
+    setSaving(true)
+    try {
+      // Call API to delete category from all services
+      const response = await fetchWithCsrf('/api/admin/categories/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryName: categoryToDelete.name })
+      })
+
+      if (response.ok) {
+        // Reload categories to get updated list
+        await loadCategories()
+      } else {
+        alert('Failed to delete category')
+      }
+    } catch (err) {
+      console.error('Failed to delete category:', err)
+      alert('Failed to delete category')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
