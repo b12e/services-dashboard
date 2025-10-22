@@ -136,18 +136,32 @@ function App() {
 
     // Build a map of category name to display name from configured categories
     const categoryDisplayMap = {}
+    const visibleCategoryNames = new Set()
     configuredCategories.forEach(cat => {
       categoryDisplayMap[cat.name] = cat.displayName
+      visibleCategoryNames.add(cat.name)
     })
 
     // First pass: Count all categories
     services.forEach(service => {
       if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
-        service.categories.forEach(category => {
-          counts[category] = (counts[category] || 0) + 1
-          // Use configured display name if available, otherwise use the category name
-          displayNames[category] = categoryDisplayMap[category] || category
-        })
+        // Check if service has at least one visible category
+        const hasVisibleCategory = service.categories.some(cat => visibleCategoryNames.has(cat))
+
+        if (hasVisibleCategory) {
+          // Count only visible categories
+          service.categories.forEach(category => {
+            if (visibleCategoryNames.has(category) || category === 'Other') {
+              counts[category] = (counts[category] || 0) + 1
+              // Use configured display name if available, otherwise use the category name
+              displayNames[category] = categoryDisplayMap[category] || category
+            }
+          })
+        } else {
+          // All categories are hidden, count towards "Other"
+          counts.Other = (counts.Other || 0) + 1
+          displayNames.Other = 'Other'
+        }
       } else {
         // Services with no categories count towards "Other"
         counts.Other = (counts.Other || 0) + 1
@@ -191,19 +205,37 @@ function App() {
   const filteredServices = useMemo(() => {
     let result = [...services]
 
+    // Build set of visible category names for filtering
+    const visibleCategoryNames = new Set(configuredCategories.map(cat => cat.name))
+
     // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'Other') {
-        // For "Other", show services that have "Other" as an explicit category
-        // OR services that have no categories at all
-        result = result.filter(service =>
-          (service.categories &&
-           Array.isArray(service.categories) &&
-           service.categories.includes('Other')) ||
-          !service.categories ||
-          !Array.isArray(service.categories) ||
-          service.categories.length === 0
-        )
+        // For "Other", show services that:
+        // 1. Have "Other" as an explicit category, OR
+        // 2. Have no categories at all, OR
+        // 3. Have categories but ALL of them are hidden
+        result = result.filter(service => {
+          // Case 1: Explicit "Other" category
+          if (service.categories &&
+              Array.isArray(service.categories) &&
+              service.categories.includes('Other')) {
+            return true
+          }
+
+          // Case 2: No categories at all
+          if (!service.categories ||
+              !Array.isArray(service.categories) ||
+              service.categories.length === 0) {
+            return true
+          }
+
+          // Case 3: All categories are hidden
+          const hasAnyVisibleCategory = service.categories.some(cat =>
+            visibleCategoryNames.has(cat)
+          )
+          return !hasAnyVisibleCategory
+        })
       } else {
         result = result.filter(service =>
           service.categories &&

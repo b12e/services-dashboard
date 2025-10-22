@@ -403,7 +403,7 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
                 (initialData.category ? [initialData.category] : []),
     hidden: initialData.hidden || false
   })
-  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [showCategoryBrowser, setShowCategoryBrowser] = useState(false)
 
   function handleChange(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -415,21 +415,22 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
     setFormData(prev => ({ ...prev, url: '' }))
   }
 
-  function addCategoryById(categoryId) {
-    if (!categoryId) return
-
-    const category = allCategories.find(c => c.id === categoryId)
-    if (!category) return
-
-    const categoryName = category.displayName || category.name
-
-    if (!formData.categories.includes(categoryName)) {
-      setFormData(prev => ({
-        ...prev,
-        categories: [...prev.categories, categoryName]
-      }))
-    }
-    setSelectedCategoryId('')
+  function toggleCategory(categoryName) {
+    setFormData(prev => {
+      if (prev.categories.includes(categoryName)) {
+        // Remove category
+        return {
+          ...prev,
+          categories: prev.categories.filter(cat => cat !== categoryName)
+        }
+      } else {
+        // Add category
+        return {
+          ...prev,
+          categories: [...prev.categories, categoryName]
+        }
+      }
+    })
   }
 
   function removeCategory(index) {
@@ -573,30 +574,19 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
         <label>Categories (optional)</label>
         {allCategories.length > 0 ? (
           <>
-            <div className="category-select-group">
-              <select
-                value={selectedCategoryId}
-                onChange={(e) => setSelectedCategoryId(e.target.value)}
-                className="category-select"
-              >
-                <option value="">Browse categories...</option>
-                {allCategories
-                  .filter(cat => !formData.categories.includes(cat.displayName || cat.name))
-                  .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.displayName || cat.name}
-                      {cat.serviceCount ? ` (${cat.serviceCount})` : ''}
-                    </option>
-                  ))}
-              </select>
+            <div className="category-browse-group">
               <button
                 type="button"
-                onClick={() => addCategoryById(selectedCategoryId)}
-                className="btn-small"
-                disabled={!selectedCategoryId}
+                onClick={() => setShowCategoryBrowser(true)}
+                className="btn-browse"
               >
-                Add
+                Browse
               </button>
+              <span className="category-count-text">
+                {formData.categories.length === 0
+                  ? 'No categories selected'
+                  : `${formData.categories.length} ${formData.categories.length === 1 ? 'category' : 'categories'} selected`}
+              </span>
             </div>
 
             {formData.categories.length > 0 && (
@@ -619,6 +609,66 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
             <p className="help-text">
               Select from existing categories. Leave empty for auto-detection from icon metadata.
             </p>
+
+            {/* Category Browser Modal */}
+            {showCategoryBrowser && (
+              <div className="icon-modal-overlay" onClick={() => setShowCategoryBrowser(false)}>
+                <div className="icon-modal category-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="icon-modal-header">
+                    <h3>Browse Categories</h3>
+                    <button
+                      className="icon-modal-close"
+                      onClick={() => setShowCategoryBrowser(false)}
+                      aria-label="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="category-browser-content">
+                    <p className="help-text">
+                      Select or deselect categories by clicking on them. Selected categories are highlighted.
+                    </p>
+
+                    <div className="category-browser-grid">
+                      {allCategories.map((cat) => {
+                        const categoryName = cat.displayName || cat.name
+                        const isSelected = formData.categories.includes(categoryName)
+
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            className={`category-browser-item ${isSelected ? 'selected' : ''}`}
+                            onClick={() => toggleCategory(categoryName)}
+                          >
+                            <div className="category-browser-name">{categoryName}</div>
+                            {cat.serviceCount > 0 && (
+                              <div className="category-browser-count">
+                                {cat.serviceCount} {cat.serviceCount === 1 ? 'service' : 'services'}
+                              </div>
+                            )}
+                            {isSelected && (
+                              <div className="category-browser-check">✓</div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="icon-modal-footer">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => setShowCategoryBrowser(false)}
+                    >
+                      Done ({formData.categories.length} selected)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <p className="help-text">
