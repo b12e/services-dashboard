@@ -502,6 +502,29 @@ button:disabled {
   flex: 1;
 }
 
+.category-select-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.category-select-group select {
+  flex: 1;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.category-select-group select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
 .category-suggestions {
   position: absolute;
   top: 100%;

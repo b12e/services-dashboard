@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import IconAutocomplete from './IconAutocomplete'
 import { fetchWithCsrf } from '../utils/csrf'
 
@@ -14,7 +14,7 @@ function ServicesManager() {
   const [sortBy, setSortBy] = useState('name') // name, source, categories, url
   const [sortOrder, setSortOrder] = useState('asc') // asc, desc
   const [baseUrl, setBaseUrl] = useState('') // Base domain from config
-  const [existingCategories, setExistingCategories] = useState([]) // All categories from existing services
+  const [allCategories, setAllCategories] = useState([]) // All categories from categories API
 
   // Handle column header click for sorting
   function handleSort(column) {
@@ -31,6 +31,7 @@ function ServicesManager() {
   useEffect(() => {
     loadServices()
     loadConfig()
+    loadCategories()
   }, [])
 
   async function loadConfig() {
@@ -45,22 +46,27 @@ function ServicesManager() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      const response = await fetch('/api/admin/categories')
+      if (response.ok) {
+        const categories = await response.json()
+        // Filter to only visible categories, sorted by displayName
+        const visibleCategories = categories
+          .filter(cat => cat.visible !== false)
+          .sort((a, b) => (a.displayName || a.name).localeCompare(b.displayName || b.name))
+        setAllCategories(visibleCategories)
+      }
+    } catch (error) {
+      console.error('Failed to load categories:', error)
+    }
+  }
+
   async function loadServices() {
     try {
       const response = await fetch('/api/admin/services')
       const data = await response.json()
       setServices(data)
-
-      // Extract unique categories from all services
-      const categoriesSet = new Set()
-      data.forEach(service => {
-        if (service.categories && Array.isArray(service.categories)) {
-          service.categories.forEach(cat => categoriesSet.add(cat))
-        } else if (service.category) {
-          categoriesSet.add(service.category)
-        }
-      })
-      setExistingCategories(Array.from(categoriesSet).sort())
     } catch (error) {
       console.error('Failed to load services:', error)
       alert('Failed to load services')
@@ -220,7 +226,7 @@ function ServicesManager() {
           onSubmit={handleAdd}
           onCancel={() => setShowAddForm(false)}
           baseUrl={baseUrl}
-          existingCategories={existingCategories}
+          allCategories={allCategories}
         />
       )}
 
@@ -272,7 +278,7 @@ function ServicesManager() {
               isEditing
               isNpmService={editForm._source === 'npm'}
               baseUrl={baseUrl}
-              existingCategories={existingCategories}
+              allCategories={allCategories}
             />
           </div>
         ) : (
@@ -382,7 +388,7 @@ function ServicesManager() {
   )
 }
 
-function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, isNpmService = false, baseUrl = '', existingCategories = [] }) {
+function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, isNpmService = false, baseUrl = '', allCategories = [] }) {
   // Determine initial mode based on whether appendBaseDomain is true
   // If no base domain is configured, always use FQDN mode
   const initialMode = baseUrl && initialData.appendBaseDomain !== false ? 'subdomain' : 'fqdn'
@@ -397,10 +403,7 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
                 (initialData.category ? [initialData.category] : []),
     hidden: initialData.hidden || false
   })
-  const [categoryInput, setCategoryInput] = useState('')
-  const [categorySuggestions, setCategorySuggestions] = useState([])
-  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false)
-  const categoryInputRef = useRef(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
 
   function handleChange(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -412,34 +415,21 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
     setFormData(prev => ({ ...prev, url: '' }))
   }
 
-  function handleCategoryInputChange(value) {
-    setCategoryInput(value)
+  function addCategoryById(categoryId) {
+    if (!categoryId) return
 
-    // Filter suggestions based on input
-    if (value.trim()) {
-      const filtered = existingCategories.filter(cat =>
-        cat.toLowerCase().includes(value.toLowerCase()) &&
-        !formData.categories.includes(cat)
-      )
-      setCategorySuggestions(filtered)
-      setShowCategorySuggestions(filtered.length > 0)
-    } else {
-      setShowCategorySuggestions(false)
-    }
-  }
-
-  function addCategory(categoryName = null) {
-    const category = categoryName || categoryInput.trim()
+    const category = allCategories.find(c => c.id === categoryId)
     if (!category) return
 
-    if (!formData.categories.includes(category)) {
+    const categoryName = category.displayName || category.name
+
+    if (!formData.categories.includes(categoryName)) {
       setFormData(prev => ({
         ...prev,
-        categories: [...prev.categories, category]
+        categories: [...prev.categories, categoryName]
       }))
     }
-    setCategoryInput('')
-    setShowCategorySuggestions(false)
+    setSelectedCategoryId('')
   }
 
   function removeCategory(index) {
@@ -448,18 +438,6 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
       categories: prev.categories.filter((_, i) => i !== index)
     }))
   }
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (categoryInputRef.current && !categoryInputRef.current.contains(event.target)) {
-        setShowCategorySuggestions(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -593,56 +571,60 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
 
       <div className="form-group">
         <label>Categories (optional)</label>
-        <div className="category-autocomplete" ref={categoryInputRef}>
-          <div className="category-input-group">
-            <input
-              type="text"
-              value={categoryInput}
-              onChange={(e) => handleCategoryInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCategory())}
-              onFocus={() => categoryInput.trim() && handleCategoryInputChange(categoryInput)}
-              placeholder="e.g., Media, Development"
-            />
-            <button type="button" onClick={() => addCategory()} className="btn-small">
-              Add
-            </button>
-          </div>
-
-          {showCategorySuggestions && categorySuggestions.length > 0 && (
-            <div className="category-suggestions">
-              {categorySuggestions.map((cat) => (
-                <div
-                  key={cat}
-                  className="category-suggestion-item"
-                  onClick={() => addCategory(cat)}
-                >
-                  {cat}
-                </div>
-              ))}
+        {allCategories.length > 0 ? (
+          <>
+            <div className="category-select-group">
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                className="category-select"
+              >
+                <option value="">Browse categories...</option>
+                {allCategories
+                  .filter(cat => !formData.categories.includes(cat.displayName || cat.name))
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.displayName || cat.name}
+                      {cat.serviceCount ? ` (${cat.serviceCount})` : ''}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => addCategoryById(selectedCategoryId)}
+                className="btn-small"
+                disabled={!selectedCategoryId}
+              >
+                Add
+              </button>
             </div>
-          )}
-        </div>
 
-        {formData.categories.length > 0 && (
-          <div className="category-tags">
-            {formData.categories.map((cat, index) => (
-              <span key={index} className="category-tag">
-                {cat}
-                <button
-                  type="button"
-                  onClick={() => removeCategory(index)}
-                  className="remove-tag"
-                  aria-label="Remove category"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+            {formData.categories.length > 0 && (
+              <div className="category-tags">
+                {formData.categories.map((cat, index) => (
+                  <span key={index} className="category-tag">
+                    {cat}
+                    <button
+                      type="button"
+                      onClick={() => removeCategory(index)}
+                      className="remove-tag"
+                      aria-label="Remove category"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="help-text">
+              Select from existing categories. Leave empty for auto-detection from icon metadata.
+            </p>
+          </>
+        ) : (
+          <p className="help-text">
+            Loading categories... Categories will be auto-detected from icon metadata if not specified.
+          </p>
         )}
-        <p className="help-text">
-          Leave empty for auto-detection. Press Enter or click Add to add multiple categories.
-        </p>
       </div>
 
       <div className="form-group checkbox">

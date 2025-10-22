@@ -142,12 +142,16 @@ function App() {
 
     // First pass: Count all categories
     services.forEach(service => {
-      if (service.categories && Array.isArray(service.categories)) {
+      if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
         service.categories.forEach(category => {
           counts[category] = (counts[category] || 0) + 1
           // Use configured display name if available, otherwise use the category name
           displayNames[category] = categoryDisplayMap[category] || category
         })
+      } else {
+        // Services with no categories count towards "Other"
+        counts.Other = (counts.Other || 0) + 1
+        displayNames.Other = 'Other'
       }
     })
 
@@ -179,38 +183,7 @@ function App() {
       // Otherwise, skip this single-entry category
     })
 
-    // Third pass: Limit to 10 categories max (excluding "all")
-    // Show 9 regular categories + "Other" = 10 total displayed categories
-    const MAX_DISPLAYED_CATEGORIES = 10
-    const MAX_REGULAR_CATEGORIES = MAX_DISPLAYED_CATEGORIES - 1 // Reserve 1 slot for "Other"
-    const categoriesWithoutAll = Object.entries(filteredCounts)
-      .filter(([key]) => key !== 'all' && key !== 'Other')
-      .sort(([, countA], [, countB]) => countB - countA) // Sort by count descending
-
-    if (categoriesWithoutAll.length > MAX_REGULAR_CATEGORIES) {
-      // Keep top 9 categories, move rest to "Other"
-      const topCategories = categoriesWithoutAll.slice(0, MAX_REGULAR_CATEGORIES)
-      const otherCategories = categoriesWithoutAll.slice(MAX_REGULAR_CATEGORIES)
-
-      const finalCounts = { all: filteredCounts.all }
-      const finalDisplayNames = { all: filteredDisplayNames.all }
-
-      // Add top categories
-      topCategories.forEach(([category, count]) => {
-        finalCounts[category] = count
-        finalDisplayNames[category] = filteredDisplayNames[category]
-      })
-
-      // Combine remaining categories into "Other"
-      const otherCount = otherCategories.reduce((sum, [, count]) => sum + count, 0)
-      if (otherCount > 0 || filteredCounts.Other) {
-        finalCounts.Other = (filteredCounts.Other || 0) + otherCount
-        finalDisplayNames.Other = 'Other'
-      }
-
-      return { counts: finalCounts, displayNames: finalDisplayNames }
-    }
-
+    // No limit on categories - controlled via admin panel visibility settings
     return { counts: filteredCounts, displayNames: filteredDisplayNames }
   }, [services, configuredCategories])
 
@@ -221,17 +194,16 @@ function App() {
     // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'Other') {
-        // For "Other", only show services that have NO categories in the displayed categories
-        // (i.e., all their categories are hidden)
-        const displayedCategories = Object.keys(categories).filter(cat => cat !== 'all' && cat !== 'Other')
-        result = result.filter(service => {
-          if (!service.categories || !Array.isArray(service.categories)) return false
-
-          // Only include if service has "Other" as explicit category
-          // OR if NONE of its categories are in the displayed list
-          return service.categories.includes('Other') ||
-                 !service.categories.some(cat => displayedCategories.includes(cat))
-        })
+        // For "Other", show services that have "Other" as an explicit category
+        // OR services that have no categories at all
+        result = result.filter(service =>
+          (service.categories &&
+           Array.isArray(service.categories) &&
+           service.categories.includes('Other')) ||
+          !service.categories ||
+          !Array.isArray(service.categories) ||
+          service.categories.length === 0
+        )
       } else {
         result = result.filter(service =>
           service.categories &&
@@ -255,7 +227,7 @@ function App() {
     }
 
     return result
-  }, [services, searchTerm, selectedCategory])
+  }, [services, searchTerm, selectedCategory, categories])
 
   if (loading) {
     return (

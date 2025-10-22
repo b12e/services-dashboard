@@ -277,14 +277,14 @@ function CategoryManager() {
         )}
       </div>
 
-      {categories.filter(c => !c.configured).length > 0 && (
+      {categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).length > 0 && (
         <div className="category-list" style={{ marginTop: '1.5rem' }}>
-          <h4>Auto-detected Categories ({categories.filter(c => !c.configured).length})</h4>
+          <h4>Auto-detected Categories ({categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).length})</h4>
           <p className="help-text">
             These categories are automatically detected from your services. You can manage them by toggling visibility or renaming them, which will convert them to configured categories.
           </p>
           <div className="category-items">
-            {categories.filter(c => !c.configured).map((category) => {
+            {categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).map((category) => {
               const originalIndex = categories.indexOf(category)
               return (
                 <div key={originalIndex} className="category-item">
