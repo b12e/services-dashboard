@@ -238,7 +238,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                   onChange={(e) => setSelectedSource(e.target.value)}
                   className="icon-source-select"
                 >
-                  <option value="all">All Sources</option>
+                  <option value="all">All Sources ({icons.length})</option>
                   <option value="dashboard-icons">Dashboard Icons ({icons.filter(i => i.source === 'dashboard-icons').length})</option>
                   <option value="simple-icons">Simple Icons ({icons.filter(i => i.source === 'simple-icons').length})</option>
                 </select>
@@ -294,9 +294,9 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                 </div>
               ) : (
                 <div className={`icon-grid ${viewMode}`}>
-                  {filteredIcons.map(icon => (
+                  {filteredIcons.map((icon, index) => (
                     <div
-                      key={icon.name}
+                      key={`${icon.source}-${icon.name}-${index}`}
                       className="icon-grid-item"
                       onClick={() => handleSelectIcon(icon.name)}
                       title={icon.name}

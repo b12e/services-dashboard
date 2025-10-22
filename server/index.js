@@ -415,9 +415,11 @@ app.get('/api/branding', async (req, res) => {
 app.get('/api/icons', async (req, res) => {
   try {
     const metadata = await loadIconsMetadata()
-    // Return simplified list with name and categories
+    // Return simplified list with name, source, title, categories, and aliases
     const iconList = metadata.map(icon => ({
       name: icon.name,
+      source: icon.source,
+      title: icon.title,
       categories: icon.categories || [],
       aliases: icon.aliases || []
     }))
