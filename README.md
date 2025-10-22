@@ -40,7 +40,7 @@ docker-compose up -d
 ### Docker Run
 
 ```bash
-mkdir -p ~/services-dashboard/data
+mkdir ./data
 
 docker run -d \
   --name services-dashboard \
@@ -48,10 +48,16 @@ docker run -d \
   -p 3001:3001 \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=your-password \
-  -v ~/services-dashboard/data:/app/data \
+  -v ./data:/app/data \
   --restart unless-stopped \
   b12e/services-dashboard:latest
 ```
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
+| `ADMIN_PASSWORD` | Admin panel password |
 
 ## Access
 
@@ -75,64 +81,8 @@ All configuration is stored in the mounted `data` directory:
    - Manage categories
    - Register passkeys (if auth enabled)
 
-### Manual Configuration
-
-Create `data/services.json`:
-```json
-{
-  "services": [
-    {
-      "name": "Plex",
-      "url": "plex",
-      "appendBaseDomain": true
-    },
-    {
-      "name": "GitHub",
-      "url": "https://github.com",
-      "appendBaseDomain": false
-    }
-  ]
-}
-```
-
-Create `data/config.json`:
-```json
-{
-  "baseUrl": "example.com",
-  "npmEnabled": true,
-  "npmConnections": [
-    {
-      "name": "Main NPM",
-      "url": "http://nginx-proxy-manager:81",
-      "username": "admin@example.com",
-      "password": "your-password"
-    }
-  ],
-  "categories": []
-}
-```
-
-## Features
-
-- Auto-discover services from Nginx Proxy Manager
-- Manual service configuration via JSON or admin UI
-- Service categories with auto-detection
-- Icon matching from 2000+ dashboard icons
-- Dark theme with responsive design
-- PWA with offline support
-- Optional authentication with passkey support
-- Automatic host detection for reverse proxy setups
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `ADMIN_USERNAME` | Admin panel username (empty = no auth) |
-| `ADMIN_PASSWORD` | Admin panel password |
 
 ## Passkey Authentication
-
-Passkey authentication works automatically with reverse proxies. The application detects the host from request headers (`X-Forwarded-Host`, `X-Forwarded-Proto`) and configures WebAuthn appropriately.
 
 **Requirements:**
 - Enable authentication by setting `ADMIN_USERNAME` and `ADMIN_PASSWORD`
@@ -141,15 +91,3 @@ Passkey authentication works automatically with reverse proxies. The application
 
 **Note:** Passkeys registered on one domain (e.g., `admin.example.com`) will only work on that same domain or subdomains of the registrable domain (`example.com`).
 
-## Service Fields
-
-- `name` - Display name
-- `url` - Service URL (subdomain or full URL with protocol/port/path)
-- `appendBaseDomain` - If true, URL is treated as subdomain and base domain is appended (default: true)
-- `icon` - Icon name (optional, auto-detected)
-- `category` - Category (optional, auto-detected)
-- `hidden` - Hide from dashboard (default: false)
-
-**URL Examples:**
-- Subdomain mode (`appendBaseDomain: true`): `url: "plex"` becomes `plex.example.com`
-- Full URL mode (`appendBaseDomain: false`): `url: "https://example.com:8080/path"`
