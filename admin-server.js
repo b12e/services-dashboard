@@ -2,7 +2,7 @@ import express from 'express'
 import session from 'express-session'
 import cookieParser from 'cookie-parser'
 import { doubleCsrf } from 'csrf-csrf'
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import crypto from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
@@ -172,12 +172,13 @@ const authRateLimiter = rateLimit({
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // Use a custom key generator to handle proxies correctly
+  // Use ipKeyGenerator helper to handle IPv6 addresses correctly
   keyGenerator: (req) => {
     // Get the real IP address from headers (for reverse proxy support)
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-           req.headers['x-real-ip'] ||
-           req.ip
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] ||
+               req.ip
+    return ipKeyGenerator(req, ip)
   },
 })
 
@@ -190,9 +191,10 @@ const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-           req.headers['x-real-ip'] ||
-           req.ip
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] ||
+               req.ip
+    return ipKeyGenerator(req, ip)
   },
 })
 
@@ -205,9 +207,10 @@ const writeRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-           req.headers['x-real-ip'] ||
-           req.ip
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] ||
+               req.ip
+    return ipKeyGenerator(req, ip)
   },
 })
 
@@ -919,7 +922,7 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
 })
 
 // POST /api/admin/categories/delete - Delete a category from all services
-app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, verifyCsrfToken, async (req, res) => {
+app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, doubleCsrfProtection, async (req, res) => {
   try {
     const { categoryName } = req.body
 
