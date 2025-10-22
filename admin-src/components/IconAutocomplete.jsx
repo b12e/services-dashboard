@@ -89,17 +89,6 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     }
   }
 
-  useEffect(() => {
-    // Close suggestions when clicking outside
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setShowSuggestions(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   async function loadIcons() {
     try {
@@ -227,7 +216,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
           <div className="icon-modal" onClick={(e) => e.stopPropagation()}>
             <div className="icon-modal-header">
               <h3>Choose an Icon</h3>
-              <button onClick={closeModal} className="icon-modal-close">×</button>
+              <button type="button" onClick={closeModal} className="icon-modal-close">×</button>
             </div>
 
             <div className="icon-modal-controls">
@@ -278,6 +267,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
 
               <div className="icon-view-toggle">
                 <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
                   className={viewMode === 'grid' ? 'active' : ''}
                   title="Grid view"
@@ -285,6 +275,7 @@ function IconAutocomplete({ value, onChange, placeholder }) {
                   ⊞
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('list')}
                   className={viewMode === 'list' ? 'active' : ''}
                   title="List view"

@@ -1019,6 +1019,7 @@ button:disabled {
 .service-icon-preview[src*="simple-icons"],
 .icon-preview-input[src*="simple-icons"],
 .icon-suggestion-preview[src*="simple-icons"],
+.icon-grid-img[src*="simple-icons"],
 .services-table .icon-cell img[src*="simple-icons"] {
   filter: brightness(0) invert(1);
 }
