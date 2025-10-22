@@ -1,0 +1,335 @@
+import { useState, useEffect } from 'react'
+import { fetchWithCsrf } from '../utils/csrf'
+
+function CategoryManager() {
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [editingIndex, setEditingIndex] = useState(null)
+  const [editName, setEditName] = useState('')
+
+  useEffect(() => {
+    loadCategories()
+  }, [])
+
+  async function loadCategories() {
+    try {
+      const response = await fetch('/api/admin/categories')
+      if (response.ok) {
+        const categories = await response.json()
+        setCategories(categories)
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function saveCategories(updatedCategories) {
+    setSaving(true)
+    try {
+      const configResponse = await fetch('/api/admin/config')
+      if (!configResponse.ok) throw new Error('Failed to load config')
+
+      const config = await configResponse.json()
+
+      // Only save categories that are configured (not auto-detected)
+      // Preserve the configured, displayName, visible, and name fields
+      const configuredCategories = updatedCategories
+        .filter(cat => cat.configured === true)
+        .map(cat => ({
+          name: cat.name,
+          displayName: cat.displayName,
+          visible: cat.visible
+        }))
+
+      config.categories = configuredCategories
+
+      const response = await fetchWithCsrf('/api/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      })
+
+      if (response.ok) {
+        // Reload all categories to get the updated merge of configured + auto-detected
+        await loadCategories()
+      } else {
+        alert('Failed to save categories')
+      }
+    } catch (err) {
+      console.error('Failed to save categories:', err)
+      alert('Failed to save categories')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleAddCategory() {
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name')
+      return
+    }
+
+    const newCategory = {
+      name: newCategoryName.trim(),
+      displayName: newCategoryName.trim(),
+      visible: true,
+      configured: true
+    }
+
+    const updatedCategories = [...categories, newCategory]
+    saveCategories(updatedCategories)
+    setNewCategoryName('')
+  }
+
+  function handleToggleVisibility(index) {
+    const updatedCategories = [...categories]
+    updatedCategories[index].visible = !updatedCategories[index].visible
+    // Mark as configured when visibility is toggled
+    updatedCategories[index].configured = true
+    saveCategories(updatedCategories)
+  }
+
+  function handleStartEdit(index) {
+    setEditingIndex(index)
+    setEditName(categories[index].displayName)
+  }
+
+  function handleSaveEdit(index) {
+    if (!editName.trim()) {
+      alert('Display name cannot be empty')
+      return
+    }
+
+    const updatedCategories = [...categories]
+    updatedCategories[index].displayName = editName.trim()
+    // Mark as configured when renamed
+    updatedCategories[index].configured = true
+    saveCategories(updatedCategories)
+    setEditingIndex(null)
+    setEditName('')
+  }
+
+  function handleCancelEdit() {
+    setEditingIndex(null)
+    setEditName('')
+  }
+
+  async function handleDeleteCategory(index) {
+    const categoryToDelete = categories[index]
+
+    if (!confirm(`Are you sure you want to delete the category "${categoryToDelete.displayName}"?\n\nThis will remove it from ${categoryToDelete.serviceCount || 0} service(s).`)) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      // Call API to delete category from all services
+      const response = await fetchWithCsrf('/api/admin/categories/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryName: categoryToDelete.name })
+      })
+
+      if (response.ok) {
+        // Reload categories to get updated list
+        await loadCategories()
+      } else {
+        alert('Failed to delete category')
+      }
+    } catch (err) {
+      console.error('Failed to delete category:', err)
+      alert('Failed to delete category')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="loading">Loading categories...</div>
+  }
+
+  return (
+    <div className="category-manager">
+      <h3>Category Management</h3>
+      <p className="help-text">
+        Manage how categories appear in the dashboard. You can rename categories and control their visibility.
+      </p>
+
+      <div className="category-add">
+        <div className="form-group">
+          <label>Add New Category</label>
+          <div className="category-add-row">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="e.g., Media, Development, Monitoring"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+            />
+            <button
+              onClick={handleAddCategory}
+              disabled={saving}
+              className="btn-primary btn-small"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="category-list">
+        <h4>Configured Categories ({categories.filter(c => c.configured).length})</h4>
+        {categories.filter(c => c.configured).length === 0 ? (
+          <p className="empty-state">
+            No categories configured. Add categories above or they will be auto-detected from services.
+          </p>
+        ) : (
+          <div className="category-items">
+            {categories.filter(c => c.configured).map((category, index) => {
+              const originalIndex = categories.indexOf(category)
+              return (
+              <div key={originalIndex} className="category-item">
+                {editingIndex === originalIndex ? (
+                  <div className="category-edit">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit(originalIndex)
+                        if (e.key === 'Escape') handleCancelEdit()
+                      }}
+                      autoFocus
+                    />
+                    <div className="category-edit-actions">
+                      <button
+                        onClick={() => handleSaveEdit(originalIndex)}
+                        className="btn-primary btn-small"
+                        disabled={saving}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="btn-small"
+                        disabled={saving}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="category-info">
+                      <div>
+                        <strong>{category.displayName}</strong>
+                        {category.name !== category.displayName && (
+                          <span className="category-original">(originally: {category.name})</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                        <span className={`category-badge ${category.configured ? 'configured' : 'auto-detected'}`}>
+                          {category.configured ? 'Configured' : 'Auto-detected'}
+                        </span>
+                        <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
+                          {category.visible ? 'Visible' : 'Hidden'}
+                        </span>
+                        {category.serviceCount !== undefined && (
+                          <span className="category-count">
+                            {category.serviceCount} {category.serviceCount === 1 ? 'service' : 'services'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="category-actions">
+                      <button
+                        onClick={() => handleToggleVisibility(originalIndex)}
+                        className="btn-small"
+                        disabled={saving}
+                      >
+                        {category.visible ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        onClick={() => handleStartEdit(originalIndex)}
+                        className="btn-small"
+                        disabled={saving}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(originalIndex)}
+                        className="btn-danger btn-small"
+                        disabled={saving}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).length > 0 && (
+        <div className="category-list" style={{ marginTop: '1.5rem' }}>
+          <h4>Auto-detected Categories ({categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).length})</h4>
+          <p className="help-text">
+            These categories are automatically detected from your services. You can manage them by toggling visibility or renaming them, which will convert them to configured categories.
+          </p>
+          <div className="category-items">
+            {categories.filter(c => !c.configured && (c.serviceCount || 0) > 0).map((category) => {
+              const originalIndex = categories.indexOf(category)
+              return (
+                <div key={originalIndex} className="category-item">
+                  <div className="category-info">
+                    <div>
+                      <strong>{category.displayName}</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                      <span className="category-badge auto-detected">
+                        Auto-detected
+                      </span>
+                      <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
+                        {category.visible ? 'Visible' : 'Hidden'}
+                      </span>
+                      {category.serviceCount !== undefined && (
+                        <span className="category-count">
+                          {category.serviceCount} {category.serviceCount === 1 ? 'service' : 'services'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="category-actions">
+                    <button
+                      onClick={() => handleToggleVisibility(originalIndex)}
+                      className="btn-small"
+                      disabled={saving}
+                    >
+                      {category.visible ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      onClick={() => handleStartEdit(originalIndex)}
+                      className="btn-small"
+                      disabled={saving}
+                    >
+                      Rename
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default CategoryManager

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { formatCategoryName } from '../utils/formatCategory'
 
-function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose }) {
+function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose, customName, customIcon }) {
   const sidebarRef = useRef(null)
 
   const handleCategoryClick = (category) => {
@@ -41,8 +41,8 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
       <aside ref={sidebarRef} className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-content">
         <div className="sidebar-header">
-          <img src="/icon.svg" alt="Logo" className="sidebar-logo" />
-          <h1 className="sidebar-brand">Quick Access</h1>
+          <img src={customIcon || "/icon.svg"} alt="Logo" className="sidebar-logo" />
+          <h1 className="sidebar-brand">{customName || 'Quick Access'}</h1>
         </div>
         <h2 className="sidebar-title">Categories</h2>
         <nav className="sidebar-nav">
@@ -50,10 +50,10 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
             className={`sidebar-item ${selectedCategory === 'all' ? 'active' : ''}`}
             onClick={() => handleCategoryClick('all')}
           >
-            <span className="sidebar-item-label">All Services</span>
-            <span className="sidebar-item-count">{categories.all || 0}</span>
+            <span className="sidebar-item-label">{categories.displayNames?.all || 'All Services'}</span>
+            <span className="sidebar-item-count">{categories.counts?.all || 0}</span>
           </button>
-          {Object.entries(categories)
+          {Object.entries(categories.counts || {})
             .filter(([key]) => key !== 'all')
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([category, count]) => (
@@ -62,7 +62,7 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
                 className={`sidebar-item ${selectedCategory === category ? 'active' : ''}`}
                 onClick={() => handleCategoryClick(category)}
               >
-                <span className="sidebar-item-label">{formatCategoryName(category)}</span>
+                <span className="sidebar-item-label">{categories.displayNames?.[category] || formatCategoryName(category)}</span>
                 <span className="sidebar-item-count">{count}</span>
               </button>
             ))}
@@ -81,7 +81,9 @@ Sidebar.propTypes = {
   selectedCategory: PropTypes.string.isRequired,
   onCategorySelect: PropTypes.func.isRequired,
   isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func
+  onClose: PropTypes.func,
+  customName: PropTypes.string,
+  customIcon: PropTypes.string
 }
 
 export default Sidebar

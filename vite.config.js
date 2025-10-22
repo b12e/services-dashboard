@@ -49,7 +49,21 @@ export default defineConfig({
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/gh\/homarr-labs\/dashboard-icons\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'services-images-cache',
+              cacheName: 'dashboard-icons-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/simple-icons@latest\/icons\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'simple-icons-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

@@ -3,9 +3,6 @@ import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import ServicesGrid from './components/ServicesGrid'
 import Sidebar from './components/Sidebar'
-import { categorizeService } from './utils/categorize'
-import { fetchNPMServices, mergeServices } from './services/npmService'
-import { preloadIconsMetadata } from './services/iconService'
 import './App.css'
 
 function App() {
@@ -18,12 +15,27 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [customName, setCustomName] = useState('Services Dashboard')
+  const [customIcon, setCustomIcon] = useState(null)
+  const [configuredCategories, setConfiguredCategories] = useState([])
 
-  // Preload icons metadata on app start
+  // Load branding from API
   useEffect(() => {
-    preloadIconsMetadata().catch(() => {
-      // Silently fail - icons will fall back to initials
-    })
+    async function loadBranding() {
+      try {
+        const response = await fetch('/api/branding')
+        if (response.ok) {
+          const branding = await response.json()
+          setCustomName(branding.customName || 'Services Dashboard')
+          setCustomIcon(branding.customIcon)
+          // Update page title
+          document.title = branding.customName || 'Services Dashboard'
+        }
+      } catch (error) {
+        // Silently fail - will use defaults
+      }
+    }
+    loadBranding()
   }, [])
 
   // Load configuration from API
@@ -53,48 +65,43 @@ function App() {
     loadConfiguration()
   }, [])
 
-  // Load services (both manual and NPM auto-detected)
+  // Load configured categories from public API
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const response = await fetch('/api/public/categories')
+        if (response.ok) {
+          const categories = await response.json()
+          setConfiguredCategories(categories)
+        }
+      } catch (error) {
+        // Silently fail - will auto-detect from services
+      }
+    }
+    loadCategories()
+  }, [])
+
+  // Load services using public API
   useEffect(() => {
     // Wait for configuration to be loaded
     if (!configLoaded) return
 
     async function loadServices() {
       try {
-        let manualServices = []
-        let npmServices = []
-
-        // Always try to load manual services from services.json
-        try {
-          const response = await fetch('/services.json')
-          if (response.ok) {
-            const data = await response.json()
-            if (data.services && Array.isArray(data.services)) {
-              manualServices = data.services
-            }
-          }
-        } catch (err) {
-          // Silently fail - services.json is optional
+        // Use the new public API endpoint
+        const response = await fetch('/api/public/services')
+        if (!response.ok) {
+          throw new Error('Failed to load services from API')
         }
 
-        // Fetch NPM services only if NPM is enabled on the server
-        if (npmEnabled) {
-          npmServices = await fetchNPMServices()
+        const servicesData = await response.json()
+
+        if (!Array.isArray(servicesData) || servicesData.length === 0) {
+          throw new Error('No services configured. Visit the admin panel at port 3001 to add services or configure NPM integration.')
         }
 
-        // Merge manual and NPM services (manual takes priority on URL conflicts)
-        const mergedServices = await mergeServices(manualServices, npmServices, baseUrl)
-
-        if (mergedServices.length === 0) {
-          throw new Error('No services found. Please configure services.json or NPM integration.')
-        }
-
-        // Auto-categorize all services (now returns array of categories)
-        const categorizedServices = mergedServices.map(service => ({
-          ...service,
-          categories: categorizeService(service)
-        }))
-
-        setServices(categorizedServices)
+        // Services already come with categories and baseUrl applied from server
+        setServices(servicesData)
         setLoading(false)
       } catch (error) {
         console.error('Error loading services:', error)
@@ -122,22 +129,52 @@ function App() {
     setIsMobileMenuOpen(false)
   }, [])
 
-  // Calculate category counts (services can be in multiple categories)
+  // Calculate category counts using configured categories with display names
   const categories = useMemo(() => {
     const counts = { all: services.length }
+    const displayNames = { all: 'All Services' }
+
+    // Build a map of category name to display name from configured categories
+    const categoryDisplayMap = {}
+    const visibleCategoryNames = new Set()
+    configuredCategories.forEach(cat => {
+      categoryDisplayMap[cat.name] = cat.displayName
+      visibleCategoryNames.add(cat.name)
+    })
 
     // First pass: Count all categories
     services.forEach(service => {
-      if (service.categories && Array.isArray(service.categories)) {
-        service.categories.forEach(category => {
-          counts[category] = (counts[category] || 0) + 1
-        })
+      if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
+        // If no visible categories configured, treat all service categories as visible
+        // This handles the case where categories haven't loaded yet
+        const hasVisibleCategory = configuredCategories.length === 0 ||
+                                    service.categories.some(cat => visibleCategoryNames.has(cat))
+
+        if (hasVisibleCategory) {
+          // Count categories (either all categories if none configured, or just visible ones)
+          service.categories.forEach(category => {
+            if (configuredCategories.length === 0 || visibleCategoryNames.has(category) || category === 'Other') {
+              counts[category] = (counts[category] || 0) + 1
+              // Use configured display name if available, otherwise use the category name
+              displayNames[category] = categoryDisplayMap[category] || category
+            }
+          })
+        } else {
+          // All categories are hidden, count towards "Other"
+          counts.Other = (counts.Other || 0) + 1
+          displayNames.Other = 'Other'
+        }
+      } else {
+        // Services with no categories count towards "Other"
+        counts.Other = (counts.Other || 0) + 1
+        displayNames.Other = 'Other'
       }
     })
 
     // Second pass: Filter out single-entry categories
     // BUT keep them if they're the only category for at least one service
     const filteredCounts = { all: counts.all }
+    const filteredDisplayNames = { all: displayNames.all }
 
     Object.entries(counts).forEach(([category, count]) => {
       if (category === 'all') return
@@ -145,6 +182,7 @@ function App() {
       // If category has more than 1 service, always include it
       if (count > 1) {
         filteredCounts[category] = count
+        filteredDisplayNames[category] = displayNames[category]
         return
       }
 
@@ -156,59 +194,54 @@ function App() {
       if (serviceWithThisCategory && serviceWithThisCategory.categories.length === 1) {
         // This is the only category for this service, so keep it
         filteredCounts[category] = count
+        filteredDisplayNames[category] = displayNames[category]
       }
       // Otherwise, skip this single-entry category
     })
 
-    // Third pass: Limit to 10 categories max (excluding "all")
-    // Show 9 regular categories + "Other" = 10 total displayed categories
-    const MAX_DISPLAYED_CATEGORIES = 10
-    const MAX_REGULAR_CATEGORIES = MAX_DISPLAYED_CATEGORIES - 1 // Reserve 1 slot for "Other"
-    const categoriesWithoutAll = Object.entries(filteredCounts)
-      .filter(([key]) => key !== 'all' && key !== 'Other')
-      .sort(([, countA], [, countB]) => countB - countA) // Sort by count descending
-
-    if (categoriesWithoutAll.length > MAX_REGULAR_CATEGORIES) {
-      // Keep top 9 categories, move rest to "Other"
-      const topCategories = categoriesWithoutAll.slice(0, MAX_REGULAR_CATEGORIES)
-      const otherCategories = categoriesWithoutAll.slice(MAX_REGULAR_CATEGORIES)
-
-      const finalCounts = { all: filteredCounts.all }
-
-      // Add top categories
-      topCategories.forEach(([category, count]) => {
-        finalCounts[category] = count
-      })
-
-      // Combine remaining categories into "Other"
-      const otherCount = otherCategories.reduce((sum, [, count]) => sum + count, 0)
-      if (otherCount > 0 || filteredCounts.Other) {
-        finalCounts.Other = (filteredCounts.Other || 0) + otherCount
-      }
-
-      return finalCounts
-    }
-
-    return filteredCounts
-  }, [services])
+    // No limit on categories - controlled via admin panel visibility settings
+    return { counts: filteredCounts, displayNames: filteredDisplayNames }
+  }, [services, configuredCategories])
 
   // Filter and sort services based on search term and category
   const filteredServices = useMemo(() => {
     let result = [...services]
 
+    // Build set of visible category names for filtering
+    const visibleCategoryNames = new Set(configuredCategories.map(cat => cat.name))
+
     // Filter by category (services can be in multiple categories)
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'Other') {
-        // For "Other", only show services that have NO categories in the displayed categories
-        // (i.e., all their categories are hidden)
-        const displayedCategories = Object.keys(categories).filter(cat => cat !== 'all' && cat !== 'Other')
+        // For "Other", show services that:
+        // 1. Have "Other" as an explicit category, OR
+        // 2. Have no categories at all, OR
+        // 3. Have categories but ALL of them are hidden (when categories are configured)
         result = result.filter(service => {
-          if (!service.categories || !Array.isArray(service.categories)) return false
+          // Case 1: Explicit "Other" category
+          if (service.categories &&
+              Array.isArray(service.categories) &&
+              service.categories.includes('Other')) {
+            return true
+          }
 
-          // Only include if service has "Other" as explicit category
-          // OR if NONE of its categories are in the displayed list
-          return service.categories.includes('Other') ||
-                 !service.categories.some(cat => displayedCategories.includes(cat))
+          // Case 2: No categories at all
+          if (!service.categories ||
+              !Array.isArray(service.categories) ||
+              service.categories.length === 0) {
+            return true
+          }
+
+          // Case 3: All categories are hidden (only check if categories are configured)
+          if (configuredCategories.length > 0) {
+            const hasAnyVisibleCategory = service.categories.some(cat =>
+              visibleCategoryNames.has(cat)
+            )
+            return !hasAnyVisibleCategory
+          }
+
+          // If no categories configured yet, don't show in "Other"
+          return false
         })
       } else {
         result = result.filter(service =>
@@ -233,12 +266,11 @@ function App() {
     }
 
     return result
-  }, [services, searchTerm, selectedCategory])
+  }, [services, searchTerm, selectedCategory, categories])
 
   if (loading) {
     return (
       <div className="container">
-        <h1>Quick Access Dashboard</h1>
         <div className="loading">Loading services...</div>
       </div>
     )
@@ -251,9 +283,6 @@ function App() {
         <div className="error">
           <h2>Failed to load services</h2>
           <p>{error}</p>
-          <p style={{ fontSize: '0.875rem', marginTop: '1rem' }}>
-            Make sure services.json is in the public directory.
-          </p>
         </div>
       </div>
     )
@@ -267,6 +296,8 @@ function App() {
         onCategorySelect={handleCategorySelect}
         isOpen={isMobileMenuOpen}
         onClose={handleMenuClose}
+        customName={customName}
+        customIcon={customIcon}
       />
       <div className="main-content">
         <div className="container">

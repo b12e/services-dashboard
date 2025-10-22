@@ -301,6 +301,11 @@ h1 {
     gap: 1.5rem;
 }
 
+/* When services have descriptions, use wider cards to give more room */
+.services-grid.has-descriptions {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
 .services-grid.hide-urls .service-url {
     display: none;
 }
@@ -347,6 +352,11 @@ h1 {
     object-fit: contain;
 }
 
+/* Make simple-icons SVGs white instead of black */
+.service-icon img[src*="simple-icons"] {
+    filter: brightness(0) invert(1);
+}
+
 .service-icon .fallback-text {
     font-size: 1.25rem;
     font-weight: 600;
@@ -354,11 +364,31 @@ h1 {
 }
 
 /* Service name - prominent */
+.service-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .service-name {
     font-size: 1rem;
     font-weight: 500;
     color: #e5e5e5;
     line-height: 1.4;
+}
+
+.service-description {
+    font-size: 0.875rem;
+    color: #a0a0a0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.25rem;
 }
 
 .service-url {

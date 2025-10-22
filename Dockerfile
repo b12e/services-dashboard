@@ -12,8 +12,11 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Build the application
+# Build the main application
 RUN npm run build
+
+# Build the admin UI
+RUN npm run admin:build
 
 # Production stage
 FROM node:20-alpine
@@ -31,9 +34,14 @@ RUN npm ci --only=production
 
 # Copy built files from build stage
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/admin-dist ./admin-dist
 
 # Copy server files
 COPY server ./server
+COPY admin-server.js ./admin-server.js
+
+# Copy public directory for services.json
+COPY public ./public
 
 # Download dashboard-icons metadata and store in container
 RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json \
@@ -43,11 +51,20 @@ RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/mai
     (cat ./dist/dashboard-icons-metadata.json | head -c 1 | grep -qE '[\[{]' || \
     echo '{}' > ./dist/dashboard-icons-metadata.json)
 
-# Expose port 3000
-EXPOSE 3000
+# Expose ports 3000 (main app) and 3001 (admin panel)
+EXPOSE 3000 3001
 
-# Set environment variable for port
+# Create data directory for persistent configuration
+RUN mkdir -p /app/data
+
+# Set environment variables
 ENV PORT=3000
+ENV ADMIN_PORT=3001
+ENV DATA_DIR=/app/data
 
-# Start the Node.js server
-CMD ["node", "server/index.js"]
+# Copy startup script
+COPY docker-start.sh ./docker-start.sh
+RUN chmod +x ./docker-start.sh
+
+# Start both servers
+CMD ["./docker-start.sh"]

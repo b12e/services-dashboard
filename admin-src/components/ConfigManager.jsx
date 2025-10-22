@@ -1,0 +1,335 @@
+import { useState, useEffect } from 'react'
+import { fetchWithCsrf } from '../utils/csrf'
+
+function ConfigManager() {
+  const [config, setConfig] = useState({
+    baseUrl: '',
+    npmEnabled: false,
+    npmConnections: [],
+    customName: 'Services Dashboard',
+    customIcon: null
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [validationResults, setValidationResults] = useState([])
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    loadConfig()
+  }, [])
+
+  async function loadConfig() {
+    try {
+      const response = await fetch('/api/admin/config')
+      const data = await response.json()
+      setConfig(data)
+    } catch (error) {
+      console.error('Failed to load config:', error)
+      alert('Failed to load configuration')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setValidationResults([])
+    try {
+      const response = await fetchWithCsrf('/api/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setValidationResults(result.validationResults || [])
+
+        // Show summary of validation results
+        const failedConnections = result.validationResults?.filter(r => !r.valid) || []
+        if (failedConnections.length > 0) {
+          alert(`Configuration saved, but ${failedConnections.length} NPM connection(s) failed validation. Check the connection status below.`)
+        } else if (result.validationResults?.length > 0) {
+          alert('Configuration saved successfully! All NPM connections validated and services are being fetched.')
+        } else {
+          alert('Configuration saved successfully!')
+        }
+      } else {
+        alert('Failed to save configuration')
+      }
+    } catch (error) {
+      console.error('Failed to save config:', error)
+      alert('Failed to save configuration')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function updateConfig(field, value) {
+    setConfig(prev => ({ ...prev, [field]: value }))
+  }
+
+  function addNpmConnection() {
+    setConfig(prev => ({
+      ...prev,
+      npmConnections: [
+        ...prev.npmConnections,
+        {
+          url: '',
+          username: '',
+          password: '',
+          name: ''
+        }
+      ]
+    }))
+  }
+
+  function updateNpmConnection(index, field, value) {
+    setConfig(prev => ({
+      ...prev,
+      npmConnections: prev.npmConnections.map((conn, i) =>
+        i === index ? { ...conn, [field]: value } : conn
+      )
+    }))
+  }
+
+  function removeNpmConnection(index) {
+    setConfig(prev => ({
+      ...prev,
+      npmConnections: prev.npmConnections.filter((_, i) => i !== index)
+    }))
+  }
+
+  async function handleIconUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('icon', file)
+
+      const response = await fetchWithCsrf('/api/admin/upload/icon', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setConfig(prev => ({ ...prev, customIcon: result.iconPath }))
+        alert('Icon uploaded successfully!')
+      } else {
+        const error = await response.json()
+        alert(`Failed to upload icon: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to upload icon:', error)
+      alert('Failed to upload icon')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function removeCustomIcon() {
+    setConfig(prev => ({ ...prev, customIcon: null }))
+  }
+
+  if (loading) {
+    return <div className="loading">Loading configuration...</div>
+  }
+
+  return (
+    <div className="config-manager">
+      <div className="manager-header">
+        <h2>Configuration</h2>
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </button>
+      </div>
+
+      <div className="config-section">
+        <h3>Branding</h3>
+        <div className="form-group">
+          <label>Dashboard Name</label>
+          <input
+            type="text"
+            value={config.customName || 'Services Dashboard'}
+            onChange={(e) => updateConfig('customName', e.target.value)}
+            placeholder="Services Dashboard"
+          />
+          <p className="help-text">
+            Custom name for your dashboard (used in page title and header)
+          </p>
+        </div>
+
+        <div className="form-group">
+          <label>Custom Icon</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {config.customIcon && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <img
+                  src={config.customIcon}
+                  alt="Custom icon"
+                  style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+                />
+                <button
+                  onClick={removeCustomIcon}
+                  className="btn-danger btn-small"
+                  type="button"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {!config.customIcon && (
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleIconUpload}
+                  disabled={uploading}
+                  id="icon-upload"
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="icon-upload" className="btn-small" style={{ cursor: 'pointer', display: 'inline-block' }}>
+                  {uploading ? 'Uploading...' : 'Upload Icon'}
+                </label>
+              </div>
+            )}
+          </div>
+          <p className="help-text">
+            Upload a custom icon for your dashboard (max 2MB, image files only)
+          </p>
+        </div>
+      </div>
+
+      <div className="config-section">
+        <h3>General Settings</h3>
+        <div className="form-group">
+          <label>Base Domain</label>
+          <input
+            type="text"
+            value={config.baseUrl}
+            onChange={(e) => updateConfig('baseUrl', e.target.value)}
+            placeholder="e.g., example.com"
+          />
+          <p className="help-text">
+            Services with appendBaseDomain=true will append this domain to their URL
+          </p>
+        </div>
+      </div>
+
+      <div className="config-section">
+        <h3>Nginx Proxy Manager Integration</h3>
+        <div className="form-group checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.npmEnabled}
+              onChange={(e) => updateConfig('npmEnabled', e.target.checked)}
+            />
+            Enable NPM auto-discovery
+          </label>
+          <p className="help-text">
+            Automatically discover services from Nginx Proxy Manager instances
+          </p>
+        </div>
+
+        {config.npmEnabled && (
+          <div className="npm-connections">
+            <div className="subsection-header">
+              <h4>NPM Connections</h4>
+              <button onClick={addNpmConnection} className="btn-small">
+                Add Connection
+              </button>
+            </div>
+
+            {config.npmConnections && config.npmConnections.length === 0 ? (
+              <p className="empty-state">No NPM connections configured</p>
+            ) : (
+              config.npmConnections?.map((conn, index) => {
+                const validation = validationResults.find(v => v.index === index)
+                return (
+                  <div key={index} className="npm-connection-item">
+                    <div className="form-group">
+                      <label>Connection Name</label>
+                      <input
+                        type="text"
+                        value={conn.name}
+                        onChange={(e) => updateNpmConnection(index, 'name', e.target.value)}
+                        placeholder="e.g., Main NPM Server"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>NPM URL</label>
+                      <input
+                        type="text"
+                        value={conn.url}
+                        onChange={(e) => updateNpmConnection(index, 'url', e.target.value)}
+                        placeholder="http://nginx-proxy-manager:81"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Username (Email)</label>
+                      <input
+                        type="text"
+                        value={conn.username || ''}
+                        onChange={(e) => updateNpmConnection(index, 'username', e.target.value)}
+                        placeholder="admin@example.com"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Password</label>
+                      <input
+                        type="password"
+                        value={conn.password || ''}
+                        onChange={(e) => updateNpmConnection(index, 'password', e.target.value)}
+                        placeholder="Your NPM password"
+                      />
+                    </div>
+
+                    {validation && (
+                      <div className={`validation-status ${validation.valid ? 'success' : 'error'}`}>
+                        {validation.valid ? (
+                          <span>✓ Connection validated successfully</span>
+                        ) : (
+                          <span>✗ {validation.error}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => removeNpmConnection(index)}
+                      className="btn-danger btn-small"
+                    >
+                      Remove Connection
+                    </button>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="config-footer">
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default ConfigManager
