@@ -204,16 +204,25 @@ function CategoryManager() {
                 ) : (
                   <>
                     <div className="category-info">
-                      <strong>{category.displayName}</strong>
-                      {category.name !== category.displayName && (
-                        <span className="category-original">(originally: {category.name})</span>
-                      )}
-                      <span className={`category-badge ${category.configured ? 'configured' : 'auto-detected'}`}>
-                        {category.configured ? 'Configured' : 'Auto-detected'}
-                      </span>
-                      <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
-                        {category.visible ? 'Visible' : 'Hidden'}
-                      </span>
+                      <div>
+                        <strong>{category.displayName}</strong>
+                        {category.name !== category.displayName && (
+                          <span className="category-original">(originally: {category.name})</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                        <span className={`category-badge ${category.configured ? 'configured' : 'auto-detected'}`}>
+                          {category.configured ? 'Configured' : 'Auto-detected'}
+                        </span>
+                        <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
+                          {category.visible ? 'Visible' : 'Hidden'}
+                        </span>
+                        {category.serviceCount !== undefined && (
+                          <span className="category-count">
+                            {category.serviceCount} {category.serviceCount === 1 ? 'service' : 'services'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="category-actions">
                       <button
@@ -259,13 +268,22 @@ function CategoryManager() {
               return (
                 <div key={originalIndex} className="category-item">
                   <div className="category-info">
-                    <strong>{category.displayName}</strong>
-                    <span className="category-badge auto-detected">
-                      Auto-detected
-                    </span>
-                    <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
-                      {category.visible ? 'Visible' : 'Hidden'}
-                    </span>
+                    <div>
+                      <strong>{category.displayName}</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                      <span className="category-badge auto-detected">
+                        Auto-detected
+                      </span>
+                      <span className={`category-status ${category.visible ? 'visible' : 'hidden'}`}>
+                        {category.visible ? 'Visible' : 'Hidden'}
+                      </span>
+                      {category.serviceCount !== undefined && (
+                        <span className="category-count">
+                          {category.serviceCount} {category.serviceCount === 1 ? 'service' : 'services'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="category-actions">
                     <button

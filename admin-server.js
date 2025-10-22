@@ -855,23 +855,60 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
 
     // Load services to find auto-detected categories
     const { manualServices, overrides } = await loadServicesData()
+
+    // Also load NPM services to get their auto-detected categories
+    let npmServices = []
+    try {
+      const npmResponse = await fetch('http://localhost:3001/api/services/npm')
+      if (npmResponse.ok) {
+        npmServices = await npmResponse.json()
+      }
+    } catch (error) {
+      // NPM services might not be available
+    }
+
     const allCategoryNames = new Set()
 
-    // Extract categories from manual services
+    // Count services per category
+    const categoryCounts = new Map()
+
+    // Extract and count categories from manual services
     manualServices.forEach(service => {
       if (Array.isArray(service.categories)) {
-        service.categories.forEach(cat => allCategoryNames.add(cat))
+        service.categories.forEach(cat => {
+          allCategoryNames.add(cat)
+          categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
+        })
       } else if (service.category) {
         allCategoryNames.add(service.category)
+        categoryCounts.set(service.category, (categoryCounts.get(service.category) || 0) + 1)
       }
     })
 
-    // Extract categories from overrides
+    // Extract and count categories from overrides
     Object.values(overrides).forEach(override => {
       if (Array.isArray(override.categories)) {
-        override.categories.forEach(cat => allCategoryNames.add(cat))
+        override.categories.forEach(cat => {
+          allCategoryNames.add(cat)
+          categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
+        })
       } else if (override.category) {
         allCategoryNames.add(override.category)
+        categoryCounts.set(override.category, (categoryCounts.get(override.category) || 0) + 1)
+      }
+    })
+
+    // Extract and count auto-detected categories from NPM services (from icon metadata)
+    npmServices.forEach(service => {
+      if (Array.isArray(service._suggestedCategories) && service._suggestedCategories.length > 0) {
+        // Only count if service doesn't already have manually set categories
+        const hasManualCategories = overrides[service._id]?.categories
+        if (!hasManualCategories) {
+          service._suggestedCategories.forEach(cat => {
+            allCategoryNames.add(cat)
+            categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
+          })
+        }
       }
     })
 
@@ -884,7 +921,8 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
         name: cat.name,
         displayName: cat.displayName || cat.name,
         visible: cat.visible !== undefined ? cat.visible : true,
-        configured: true
+        configured: true,
+        serviceCount: categoryCounts.get(cat.name) || 0
       })
     })
 
@@ -895,7 +933,8 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
           name: name,
           displayName: name,
           visible: true,
-          configured: false
+          configured: false,
+          serviceCount: categoryCounts.get(name) || 0
         })
       }
     })

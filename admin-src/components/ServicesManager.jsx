@@ -11,18 +11,56 @@ function ServicesManager() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSource, setFilterSource] = useState('all') // all, manual, npm
   const [filterVisibility, setFilterVisibility] = useState('all') // all, visible, hidden
-  const [sortBy, setSortBy] = useState('name') // name, source, categories
+  const [sortBy, setSortBy] = useState('name') // name, source, categories, url
   const [sortOrder, setSortOrder] = useState('asc') // asc, desc
+  const [baseUrl, setBaseUrl] = useState('') // Base domain from config
+  const [existingCategories, setExistingCategories] = useState([]) // All categories from existing services
+
+  // Handle column header click for sorting
+  function handleSort(column) {
+    if (sortBy === column) {
+      // Toggle sort order if clicking the same column
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortBy(column)
+      setSortOrder('asc')
+    }
+  }
 
   useEffect(() => {
     loadServices()
+    loadConfig()
   }, [])
+
+  async function loadConfig() {
+    try {
+      const response = await fetch('/api/admin/config')
+      if (response.ok) {
+        const data = await response.json()
+        setBaseUrl(data.baseUrl || '')
+      }
+    } catch (error) {
+      console.error('Failed to load config:', error)
+    }
+  }
 
   async function loadServices() {
     try {
       const response = await fetch('/api/admin/services')
       const data = await response.json()
       setServices(data)
+
+      // Extract unique categories from all services
+      const categoriesSet = new Set()
+      data.forEach(service => {
+        if (service.categories && Array.isArray(service.categories)) {
+          service.categories.forEach(cat => categoriesSet.add(cat))
+        } else if (service.category) {
+          categoriesSet.add(service.category)
+        }
+      })
+      setExistingCategories(Array.from(categoriesSet).sort())
     } catch (error) {
       console.error('Failed to load services:', error)
       alert('Failed to load services')
@@ -145,6 +183,9 @@ function ServicesManager() {
           const bCat = Array.isArray(b.categories) ? b.categories.join(', ') : (b.category || '')
           comparison = aCat.localeCompare(bCat)
           break
+        case 'url':
+          comparison = (a.url || '').localeCompare(b.url || '')
+          break
         default:
           comparison = 0
       }
@@ -159,71 +200,65 @@ function ServicesManager() {
   return (
     <div className="services-manager">
       <div className="manager-header">
-        <h2>Manage Services ({filteredAndSortedServices.length} of {services.length})</h2>
-        <button
-          className="btn-primary"
-          onClick={() => setShowAddForm(!showAddForm)}
-        >
-          {showAddForm ? 'Cancel' : 'Add Service'}
-        </button>
+        <h2>
+          {showAddForm ? 'Add Service' :
+           editingIndex ? 'Edit Service' :
+           `Manage Services (${filteredAndSortedServices.length} of ${services.length})`}
+        </h2>
+        {!editingIndex && (
+          <button
+            className="btn-primary"
+            onClick={() => setShowAddForm(!showAddForm)}
+          >
+            {showAddForm ? 'Cancel' : 'Add Service'}
+          </button>
+        )}
       </div>
 
       {showAddForm && (
         <ServiceForm
           onSubmit={handleAdd}
           onCancel={() => setShowAddForm(false)}
+          baseUrl={baseUrl}
+          existingCategories={existingCategories}
         />
       )}
 
       {/* Filters and search */}
-      <div className="services-filters">
-        <div className="filter-group">
-          <input
-            type="text"
-            placeholder="Search services..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
+      {!showAddForm && !editingIndex && (
+        <div className="services-controls">
+          <div className="services-filters">
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
 
-        <div className="filter-group">
-          <label>Source:</label>
-          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
-            <option value="all">All</option>
-            <option value="manual">Manual</option>
-            <option value="npm">NPM</option>
-          </select>
-        </div>
+            <label>
+              Source:
+              <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
+                <option value="all">All</option>
+                <option value="manual">Manual</option>
+                <option value="npm">NPM</option>
+              </select>
+            </label>
 
-        <div className="filter-group">
-          <label>Visibility:</label>
-          <select value={filterVisibility} onChange={(e) => setFilterVisibility(e.target.value)}>
-            <option value="all">All</option>
-            <option value="visible">Visible</option>
-            <option value="hidden">Hidden</option>
-          </select>
+            <label>
+              Visibility:
+              <select value={filterVisibility} onChange={(e) => setFilterVisibility(e.target.value)}>
+                <option value="all">All</option>
+                <option value="visible">Visible</option>
+                <option value="hidden">Hidden</option>
+              </select>
+            </label>
+          </div>
         </div>
-
-        <div className="filter-group">
-          <label>Sort by:</label>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="name">Name</option>
-            <option value="source">Source</option>
-            <option value="categories">Categories</option>
-          </select>
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="sort-order-btn"
-            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-          >
-            {sortOrder === 'asc' ? '↑' : '↓'}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Table View */}
-      <div className="services-table-wrapper">
+      {!showAddForm && (
+        <div className="services-table-wrapper">
         {filteredAndSortedServices.length === 0 ? (
           <p className="empty-state">
             {services.length === 0 ? 'No services configured. Add one to get started!' : 'No services match your filters.'}
@@ -236,6 +271,8 @@ function ServicesManager() {
               onCancel={cancelEdit}
               isEditing
               isNpmService={editForm._source === 'npm'}
+              baseUrl={baseUrl}
+              existingCategories={existingCategories}
             />
           </div>
         ) : (
@@ -243,12 +280,35 @@ function ServicesManager() {
             <thead>
               <tr>
                 <th>Icon</th>
-                <th>Name</th>
+                <th
+                  className="sortable-header"
+                  onClick={() => handleSort('name')}
+                  title="Click to sort by Name"
+                >
+                  Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
                 <th>Description</th>
-                <th>URL</th>
-                <th>Source</th>
-                <th>Categories</th>
-                <th>Status</th>
+                <th
+                  className="sortable-header"
+                  onClick={() => handleSort('url')}
+                  title="Click to sort by URL"
+                >
+                  URL {sortBy === 'url' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  className="sortable-header"
+                  onClick={() => handleSort('source')}
+                  title="Click to sort by Source"
+                >
+                  Source {sortBy === 'source' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
+                <th
+                  className="sortable-header"
+                  onClick={() => handleSort('categories')}
+                  title="Click to sort by Categories"
+                >
+                  Categories {sortBy === 'categories' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -276,16 +336,7 @@ function ServicesManager() {
                         <>
                           <span className="badge-npm">NPM</span>
                           {service._hasOverrides && (
-                            <>
-                              <span className="badge-override">Customized</span>
-                              <button
-                                onClick={() => handleDelete(service._id, service._source)}
-                                className="btn-small btn-reset"
-                                title="Reset to NPM defaults"
-                              >
-                                Reset
-                              </button>
-                            </>
+                            <span className="badge-override">Customized</span>
                           )}
                         </>
                       ) : (
@@ -298,18 +349,26 @@ function ServicesManager() {
                       ? service.categories.join(', ')
                       : (service.category || '-')}
                   </td>
-                  <td className="status-cell">
-                    {service.hidden ? <span className="badge-hidden-sm">Hidden</span> : <span className="badge-visible">Visible</span>}
-                  </td>
                   <td className="actions-cell">
-                    <button onClick={() => startEdit(service._id, service)} className="btn-small btn-edit">
-                      {service._source === 'npm' ? 'Customize' : 'Edit'}
-                    </button>
-                    {service._source === 'manual' && (
-                      <button onClick={() => handleDelete(service._id, service._source)} className="btn-small btn-danger">
-                        Delete
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <button onClick={() => startEdit(service._id, service)} className="btn-small btn-edit">
+                        {service._source === 'npm' ? 'Customize' : 'Edit'}
                       </button>
-                    )}
+                      {service._source === 'npm' && service._hasOverrides && (
+                        <button
+                          onClick={() => handleDelete(service._id, service._source)}
+                          className="btn-small btn-reset"
+                          title="Reset to NPM defaults"
+                        >
+                          Reset
+                        </button>
+                      )}
+                      {service._source === 'manual' && (
+                        <button onClick={() => handleDelete(service._id, service._source)} className="btn-small btn-danger">
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 )
@@ -317,14 +376,16 @@ function ServicesManager() {
             </tbody>
           </table>
         )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, isNpmService = false }) {
+function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, isNpmService = false, baseUrl = '', existingCategories = [] }) {
   // Determine initial mode based on whether appendBaseDomain is true
-  const initialMode = initialData.appendBaseDomain !== false ? 'subdomain' : 'fqdn'
+  // If no base domain is configured, always use FQDN mode
+  const initialMode = baseUrl && initialData.appendBaseDomain !== false ? 'subdomain' : 'fqdn'
 
   const [urlMode, setUrlMode] = useState(initialMode)
   const [formData, setFormData] = useState({
@@ -337,6 +398,9 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
     hidden: initialData.hidden || false
   })
   const [categoryInput, setCategoryInput] = useState('')
+  const [categorySuggestions, setCategorySuggestions] = useState([])
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false)
+  const categoryInputRef = useRef(null)
 
   function handleChange(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -348,17 +412,34 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
     setFormData(prev => ({ ...prev, url: '' }))
   }
 
-  function addCategory() {
-    if (!categoryInput.trim()) return
+  function handleCategoryInputChange(value) {
+    setCategoryInput(value)
 
-    const newCategory = categoryInput.trim()
-    if (!formData.categories.includes(newCategory)) {
+    // Filter suggestions based on input
+    if (value.trim()) {
+      const filtered = existingCategories.filter(cat =>
+        cat.toLowerCase().includes(value.toLowerCase()) &&
+        !formData.categories.includes(cat)
+      )
+      setCategorySuggestions(filtered)
+      setShowCategorySuggestions(filtered.length > 0)
+    } else {
+      setShowCategorySuggestions(false)
+    }
+  }
+
+  function addCategory(categoryName = null) {
+    const category = categoryName || categoryInput.trim()
+    if (!category) return
+
+    if (!formData.categories.includes(category)) {
       setFormData(prev => ({
         ...prev,
-        categories: [...prev.categories, newCategory]
+        categories: [...prev.categories, category]
       }))
     }
     setCategoryInput('')
+    setShowCategorySuggestions(false)
   }
 
   function removeCategory(index) {
@@ -367,6 +448,18 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
       categories: prev.categories.filter((_, i) => i !== index)
     }))
   }
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (categoryInputRef.current && !categoryInputRef.current.contains(event.target)) {
+        setShowCategorySuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -424,48 +517,50 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
 
       {!isNpmService && (
         <>
-          <div className="form-group">
-            <label>URL Type</label>
-            <div className="url-mode-toggle">
-              <label className={`mode-option ${urlMode === 'subdomain' ? 'active' : ''}`}>
-                <input
-                  type="radio"
-                  name="urlMode"
-                  value="subdomain"
-                  checked={urlMode === 'subdomain'}
-                  onChange={() => handleModeChange('subdomain')}
-                />
-                <span>Subdomain (uses base domain)</span>
-              </label>
-              <label className={`mode-option ${urlMode === 'fqdn' ? 'active' : ''}`}>
-                <input
-                  type="radio"
-                  name="urlMode"
-                  value="fqdn"
-                  checked={urlMode === 'fqdn'}
-                  onChange={() => handleModeChange('fqdn')}
-                />
-                <span>Full URL</span>
-              </label>
+          {baseUrl && (
+            <div className="form-group">
+              <label>URL Type</label>
+              <div className="url-mode-toggle">
+                <label className={`mode-option ${urlMode === 'subdomain' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="urlMode"
+                    value="subdomain"
+                    checked={urlMode === 'subdomain'}
+                    onChange={() => handleModeChange('subdomain')}
+                  />
+                  <span>Subdomain (uses base domain)</span>
+                </label>
+                <label className={`mode-option ${urlMode === 'fqdn' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="urlMode"
+                    value="fqdn"
+                    checked={urlMode === 'fqdn'}
+                    onChange={() => handleModeChange('fqdn')}
+                  />
+                  <span>Full URL</span>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="form-group">
             <label>
-              {urlMode === 'subdomain' ? 'Subdomain' : 'Full URL (with protocol, port, path)'}
+              {urlMode === 'subdomain' ? 'Subdomain' : 'URL'}
             </label>
             <input
               type="text"
               value={formData.url}
               onChange={(e) => handleChange('url', e.target.value)}
               placeholder={urlMode === 'subdomain'
-                ? 'e.g., plex (will become plex.yourdomain.com)'
+                ? `e.g., plex (will become plex.${baseUrl})`
                 : 'e.g., https://example.com:8080/path'}
               required
             />
-            {urlMode === 'subdomain' && (
+            {urlMode === 'subdomain' && baseUrl && (
               <p className="help-text">
-                This will be combined with the base domain configured in Settings
+                Will be combined with base domain: <strong>{baseUrl}</strong>
               </p>
             )}
           </div>
@@ -498,18 +593,36 @@ function ServiceForm({ initialData = {}, onSubmit, onCancel, isEditing = false, 
 
       <div className="form-group">
         <label>Categories (optional)</label>
-        <div className="category-input-group">
-          <input
-            type="text"
-            value={categoryInput}
-            onChange={(e) => setCategoryInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCategory())}
-            placeholder="e.g., Media, Development"
-          />
-          <button type="button" onClick={addCategory} className="btn-small">
-            Add
-          </button>
+        <div className="category-autocomplete" ref={categoryInputRef}>
+          <div className="category-input-group">
+            <input
+              type="text"
+              value={categoryInput}
+              onChange={(e) => handleCategoryInputChange(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCategory())}
+              onFocus={() => categoryInput.trim() && handleCategoryInputChange(categoryInput)}
+              placeholder="e.g., Media, Development"
+            />
+            <button type="button" onClick={() => addCategory()} className="btn-small">
+              Add
+            </button>
+          </div>
+
+          {showCategorySuggestions && categorySuggestions.length > 0 && (
+            <div className="category-suggestions">
+              {categorySuggestions.map((cat) => (
+                <div
+                  key={cat}
+                  className="category-suggestion-item"
+                  onClick={() => addCategory(cat)}
+                >
+                  {cat}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
         {formData.categories.length > 0 && (
           <div className="category-tags">
             {formData.categories.map((cat, index) => (
