@@ -27,6 +27,7 @@ import {
   convertNamesToIds,
   convertIdsToNames
 } from './server/category-manager.js'
+import { categorizeService } from './server/categorize.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -766,17 +767,24 @@ app.get('/api/admin/services', apiRateLimiter, requireAuth, async (req, res) => 
       })
     )
 
-    // Convert category IDs to names for frontend
+    // Auto-categorize and convert category IDs to names for frontend
     const servicesWithCategoryNames = await Promise.all(
       servicesWithIcons.map(async (service) => {
         if (service.categoryIds && service.categoryIds.length > 0) {
+          // Service has explicit category IDs
           const categoryNames = await convertIdsToNames(service.categoryIds)
           return {
             ...service,
             categories: categoryNames
           }
         }
-        return service
+
+        // Auto-categorize services without category IDs
+        const categoryNames = categorizeService(service)
+        return {
+          ...service,
+          categories: categoryNames
+        }
       })
     )
 

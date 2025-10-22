@@ -145,13 +145,15 @@ function App() {
     // First pass: Count all categories
     services.forEach(service => {
       if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
-        // Check if service has at least one visible category
-        const hasVisibleCategory = service.categories.some(cat => visibleCategoryNames.has(cat))
+        // If no visible categories configured, treat all service categories as visible
+        // This handles the case where categories haven't loaded yet
+        const hasVisibleCategory = configuredCategories.length === 0 ||
+                                    service.categories.some(cat => visibleCategoryNames.has(cat))
 
         if (hasVisibleCategory) {
-          // Count only visible categories
+          // Count categories (either all categories if none configured, or just visible ones)
           service.categories.forEach(category => {
-            if (visibleCategoryNames.has(category) || category === 'Other') {
+            if (configuredCategories.length === 0 || visibleCategoryNames.has(category) || category === 'Other') {
               counts[category] = (counts[category] || 0) + 1
               // Use configured display name if available, otherwise use the category name
               displayNames[category] = categoryDisplayMap[category] || category
@@ -214,7 +216,7 @@ function App() {
         // For "Other", show services that:
         // 1. Have "Other" as an explicit category, OR
         // 2. Have no categories at all, OR
-        // 3. Have categories but ALL of them are hidden
+        // 3. Have categories but ALL of them are hidden (when categories are configured)
         result = result.filter(service => {
           // Case 1: Explicit "Other" category
           if (service.categories &&
@@ -230,11 +232,16 @@ function App() {
             return true
           }
 
-          // Case 3: All categories are hidden
-          const hasAnyVisibleCategory = service.categories.some(cat =>
-            visibleCategoryNames.has(cat)
-          )
-          return !hasAnyVisibleCategory
+          // Case 3: All categories are hidden (only check if categories are configured)
+          if (configuredCategories.length > 0) {
+            const hasAnyVisibleCategory = service.categories.some(cat =>
+              visibleCategoryNames.has(cat)
+            )
+            return !hasAnyVisibleCategory
+          }
+
+          // If no categories configured yet, don't show in "Other"
+          return false
         })
       } else {
         result = result.filter(service =>

@@ -123,18 +123,29 @@ function IconAutocomplete({ value, onChange, placeholder }) {
     }
   }
 
+  // Normalize string for fuzzy matching (remove spaces, hyphens, underscores)
+  function normalizeForSearch(str) {
+    return str.toLowerCase().replace(/[\s\-_]/g, '')
+  }
+
+  // Check if search term matches text with fuzzy matching
+  function fuzzyMatch(text, searchTerm) {
+    const normalizedText = normalizeForSearch(text)
+    const normalizedSearch = normalizeForSearch(searchTerm)
+    return normalizedText.includes(normalizedSearch)
+  }
+
   // Filter icons based on search, category, and source
   useEffect(() => {
     let filtered = icons
 
-    // Filter by search term
+    // Filter by search term with fuzzy matching
     if (searchTerm) {
-      const search = searchTerm.toLowerCase()
       filtered = filtered.filter(icon => {
-        return icon.name.toLowerCase().includes(search) ||
-               (icon.title && icon.title.toLowerCase().includes(search)) ||
-               (icon.aliases && icon.aliases.some(alias => alias.toLowerCase().includes(search))) ||
-               (icon.categories && icon.categories.some(cat => cat.toLowerCase().includes(search)))
+        return fuzzyMatch(icon.name, searchTerm) ||
+               (icon.title && fuzzyMatch(icon.title, searchTerm)) ||
+               (icon.aliases && icon.aliases.some(alias => fuzzyMatch(alias, searchTerm))) ||
+               (icon.categories && icon.categories.some(cat => fuzzyMatch(cat, searchTerm)))
       })
     }
 
