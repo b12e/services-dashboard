@@ -860,7 +860,7 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
     // This includes auto-detected categories from categorize.js and icon metadata
     let allServices = []
     try {
-      const servicesResponse = await fetch('http://localhost:3000/api/services')
+      const servicesResponse = await fetch('http://localhost:3000/api/public/services')
       if (servicesResponse.ok) {
         allServices = await servicesResponse.json()
       }
@@ -977,7 +977,7 @@ app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, doubleCsrf
 
     // Save changes if any were made
     if (manualServicesChanged || overridesChanged) {
-      await saveServicesData({ manualServices, overrides })
+      await saveServicesData(manualServices, overrides)
     }
 
     // Also remove from configured categories in config
@@ -995,6 +995,39 @@ app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, doubleCsrf
   } catch (error) {
     console.error('Error deleting category:', error)
     res.status(500).json({ error: 'Failed to delete category' })
+  }
+})
+
+// GET /api/icons - Proxy to main server for icon list
+app.get('/api/icons', apiRateLimiter, async (req, res) => {
+  try {
+    const response = await fetch('http://localhost:3000/api/icons')
+    if (response.ok) {
+      const data = await response.json()
+      res.json(data)
+    } else {
+      res.status(response.status).json({ error: 'Failed to fetch icons from main server' })
+    }
+  } catch (error) {
+    console.error('Error proxying icons request:', error)
+    res.status(500).json({ error: 'Failed to fetch icons' })
+  }
+})
+
+// GET /api/icons/preview/:iconName - Proxy to main server for icon preview
+app.get('/api/icons/preview/:iconName', apiRateLimiter, async (req, res) => {
+  try {
+    const { iconName } = req.params
+    const response = await fetch(`http://localhost:3000/api/icons/preview/${encodeURIComponent(iconName)}`)
+    if (response.ok) {
+      const data = await response.json()
+      res.json(data)
+    } else {
+      res.status(response.status).json({ error: 'Icon not found' })
+    }
+  } catch (error) {
+    console.error('Error proxying icon preview request:', error)
+    res.status(500).json({ error: 'Failed to fetch icon preview' })
   }
 })
 
