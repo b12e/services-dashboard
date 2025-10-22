@@ -9,6 +9,14 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { categorizeService } from './categorize.js'
 import { resolveServiceIcon, resolveIconUrl } from './icon-resolver.js'
+import {
+  loadCategories,
+  getCategoryById,
+  getOrCreateCategory,
+  convertIdsToNames,
+  convertNamesToIds,
+  getCategoryIdToNameMap
+} from './category-manager.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -216,14 +224,14 @@ async function findIconForService(serviceName) {
       console.log(`  Using light variant: "${iconName}"`)
     }
 
-    // Get all categories from metadata
-    let categories = []
+    // Get all categories from metadata and convert to IDs
+    let categoryIds = []
     if (bestMatch.categories && Array.isArray(bestMatch.categories)) {
-      categories = bestMatch.categories
+      categoryIds = await convertNamesToIds(bestMatch.categories)
     }
 
     console.log(`  ✓ Returning icon: "${iconName}" (score: ${bestScore})`)
-    return { name: iconName, categories }
+    return { name: iconName, categoryIds }
   }
 
   console.log(`  ✗ No match found (best score: ${bestScore})`)
@@ -255,7 +263,7 @@ async function convertProxyHostToService(proxyHost) {
     url: url,
     appendBaseDomain: false,
     icon: iconMatch?.name || null,
-    _suggestedCategories: iconMatch?.categories || [],
+    _suggestedCategoryIds: iconMatch?.categoryIds || [],
     _npmMetadata: {
       id: proxyHost.id,
       enabled: proxyHost.enabled,
@@ -517,7 +525,7 @@ function mergeServiceWithOverride(service, override) {
     ...(override.name !== undefined && { name: override.name }),
     ...(override.description !== undefined && { description: override.description }),
     ...(override.icon !== undefined && { icon: override.icon }),
-    ...(override.categories !== undefined && { categories: override.categories }),
+    ...(override.categoryIds !== undefined && { categoryIds: override.categoryIds }),
     ...(override.hidden !== undefined && { hidden: override.hidden }),
     _isNpmDiscovered: true,
     _hasOverrides: true
@@ -549,17 +557,19 @@ async function getAllVisibleServices() {
 
   // Auto-categorize services that don't have categories yet
   // This ensures categories are applied but allows manual customization
-  const categorizedServices = allServices.map(service => {
-    if (service.categories && service.categories.length > 0) {
-      // Service already has categories (manual or from override)
+  const categorizedServices = await Promise.all(allServices.map(async (service) => {
+    if (service.categoryIds && service.categoryIds.length > 0) {
+      // Service already has category IDs (manual or from override)
       return service
     }
     // Auto-categorize services without categories
+    const categoryNames = categorizeService(service)
+    const categoryIds = await convertNamesToIds(categoryNames)
     return {
       ...service,
-      categories: categorizeService(service)
+      categoryIds
     }
-  })
+  }))
 
   // Resolve icons for all services
   const servicesWithIcons = await Promise.all(
@@ -572,50 +582,38 @@ async function getAllVisibleServices() {
     })
   )
 
-  return servicesWithIcons
+  // Convert category IDs to names for frontend compatibility
+  const servicesWithCategoryNames = await Promise.all(
+    servicesWithIcons.map(async (service) => {
+      if (service.categoryIds && service.categoryIds.length > 0) {
+        const categoryNames = await convertIdsToNames(service.categoryIds)
+        return {
+          ...service,
+          categories: categoryNames
+        }
+      }
+      return {
+        ...service,
+        categories: []
+      }
+    })
+  )
+
+  return servicesWithCategoryNames
 }
 
 // Helper function to extract categories from services
 async function getAllCategories() {
-  const config = await loadConfig()
-  const services = await getAllVisibleServices()
-  const configuredCategories = config.categories || []
+  const categories = await loadCategories()
 
-  // Extract all category names from services
-  const categoryNamesFromServices = new Set()
-  services.forEach(service => {
-    if (Array.isArray(service.categories)) {
-      service.categories.forEach(cat => categoryNamesFromServices.add(cat))
-    } else if (service.category) {
-      categoryNamesFromServices.add(service.category)
-    }
-  })
-
-  // Create category map
-  const categoryMap = new Map()
-
-  // Add configured categories first (with their display names and visibility)
-  configuredCategories.forEach(cat => {
-    categoryMap.set(cat.name, {
+  // Return only visible categories with their display names
+  return categories
+    .filter(cat => cat.visible !== false)
+    .map(cat => ({
       name: cat.name,
       displayName: cat.displayName || cat.name,
-      visible: cat.visible !== undefined ? cat.visible : true
-    })
-  })
-
-  // Add auto-detected categories that aren't configured
-  categoryNamesFromServices.forEach(name => {
-    if (!categoryMap.has(name)) {
-      categoryMap.set(name, {
-        name: name,
-        displayName: name,
-        visible: true
-      })
-    }
-  })
-
-  // Return only visible categories
-  return Array.from(categoryMap.values()).filter(cat => cat.visible)
+      visible: cat.visible
+    }))
 }
 
 // PUBLIC API: Get all visible services

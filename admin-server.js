@@ -16,6 +16,17 @@ import {
 } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import { resolveServiceIcon } from './server/icon-resolver.js'
+import {
+  loadCategories,
+  saveCategories,
+  getCategoryById,
+  getCategoryByName,
+  getOrCreateCategory,
+  updateCategory,
+  deleteCategory,
+  convertNamesToIds,
+  convertIdsToNames
+} from './server/category-manager.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -684,9 +695,10 @@ async function loadServicesData() {
 
 // Helper to save services data
 async function saveServicesData(manualServices, overrides) {
+  // Ensure we have valid data structures
   const json = {
-    manualServices,
-    overrides
+    manualServices: Array.isArray(manualServices) ? manualServices : [],
+    overrides: typeof overrides === 'object' && overrides !== null ? overrides : {}
   }
   await fs.writeFile(SERVICES_PATH, JSON.stringify(json, null, 2))
 }
@@ -754,7 +766,21 @@ app.get('/api/admin/services', apiRateLimiter, requireAuth, async (req, res) => 
       })
     )
 
-    res.json(servicesWithIcons)
+    // Convert category IDs to names for frontend
+    const servicesWithCategoryNames = await Promise.all(
+      servicesWithIcons.map(async (service) => {
+        if (service.categoryIds && service.categoryIds.length > 0) {
+          const categoryNames = await convertIdsToNames(service.categoryIds)
+          return {
+            ...service,
+            categories: categoryNames
+          }
+        }
+        return service
+      })
+    )
+
+    res.json(servicesWithCategoryNames)
   } catch (error) {
     console.error('Error reading services:', error)
     res.status(500).json({ error: 'Failed to read services' })
@@ -767,11 +793,23 @@ app.post('/api/admin/services', writeRateLimiter, doubleCsrfProtection, requireA
     const newService = req.body
     const { manualServices, overrides } = await loadServicesData()
 
+    // Convert category names to IDs if present
+    if (newService.categories && Array.isArray(newService.categories)) {
+      newService.categoryIds = await convertNamesToIds(newService.categories)
+      delete newService.categories
+    }
+
     manualServices.push(newService)
     await saveServicesData(manualServices, overrides)
 
+    // Convert back to names for response
+    const responseService = { ...newService }
+    if (responseService.categoryIds) {
+      responseService.categories = await convertIdsToNames(responseService.categoryIds)
+    }
+
     res.json({
-      ...newService,
+      ...responseService,
       _id: `manual_${manualServices.length - 1}`,
       _source: 'manual'
     })
@@ -788,6 +826,12 @@ app.put('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requi
     const updatedData = req.body
     const { manualServices, overrides } = await loadServicesData()
 
+    // Convert category names to IDs if present
+    if (updatedData.categories && Array.isArray(updatedData.categories)) {
+      updatedData.categoryIds = await convertNamesToIds(updatedData.categories)
+      delete updatedData.categories
+    }
+
     if (serviceId.startsWith('manual_')) {
       // Update manual service
       const index = parseInt(serviceId.replace('manual_', ''))
@@ -802,7 +846,7 @@ app.put('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requi
       if (updatedData.name !== undefined) override.name = updatedData.name
       if (updatedData.description !== undefined) override.description = updatedData.description
       if (updatedData.icon !== undefined) override.icon = updatedData.icon
-      if (updatedData.categories !== undefined) override.categories = updatedData.categories
+      if (updatedData.categoryIds !== undefined) override.categoryIds = updatedData.categoryIds
       if (updatedData.hidden !== undefined) override.hidden = updatedData.hidden
 
       overrides[serviceId] = override
@@ -811,7 +855,14 @@ app.put('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requi
     }
 
     await saveServicesData(manualServices, overrides)
-    res.json(updatedData)
+
+    // Convert back to names for response
+    const responseData = { ...updatedData }
+    if (responseData.categoryIds) {
+      responseData.categories = await convertIdsToNames(responseData.categoryIds)
+    }
+
+    res.json(responseData)
   } catch (error) {
     console.error('Error updating service:', error)
     res.status(500).json({ error: 'Failed to update service' })
@@ -851,10 +902,8 @@ app.delete('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, re
 // GET /api/admin/categories - Get all categories (configured + auto-detected)
 app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) => {
   try {
-    // Load config for configured categories
-    const configData = await fs.readFile(CONFIG_PATH, 'utf-8')
-    const config = JSON.parse(configData)
-    const configuredCategories = config.categories || []
+    // Load all categories from category manager
+    const categories = await loadCategories()
 
     // Get all services with their actual categories from the main server
     // This includes auto-detected categories from categorize.js and icon metadata
@@ -868,53 +917,26 @@ app.get('/api/admin/categories', apiRateLimiter, requireAuth, async (req, res) =
       console.error('Failed to fetch services from main server:', error)
     }
 
-    const allCategoryNames = new Set()
-
-    // Count services per category
+    // Count services per category (by name)
     const categoryCounts = new Map()
-
-    // Extract and count categories from all services (includes auto-detected)
     allServices.forEach(service => {
       if (Array.isArray(service.categories)) {
         service.categories.forEach(cat => {
-          allCategoryNames.add(cat)
           categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1)
         })
-      } else if (service.category) {
-        allCategoryNames.add(service.category)
-        categoryCounts.set(service.category, (categoryCounts.get(service.category) || 0) + 1)
       }
     })
 
-    // Merge configured and auto-detected categories
-    const categoryMap = new Map()
+    // Map categories with their service counts
+    const categoriesWithCounts = categories.map(cat => ({
+      name: cat.name,
+      displayName: cat.displayName || cat.name,
+      visible: cat.visible !== false,
+      configured: cat.configured || false,
+      serviceCount: categoryCounts.get(cat.name) || 0
+    }))
 
-    // Add configured categories first
-    configuredCategories.forEach(cat => {
-      categoryMap.set(cat.name, {
-        name: cat.name,
-        displayName: cat.displayName || cat.name,
-        visible: cat.visible !== undefined ? cat.visible : true,
-        configured: true,
-        serviceCount: categoryCounts.get(cat.name) || 0
-      })
-    })
-
-    // Add auto-detected categories that aren't already configured
-    allCategoryNames.forEach(name => {
-      if (!categoryMap.has(name)) {
-        categoryMap.set(name, {
-          name: name,
-          displayName: name,
-          visible: true,
-          configured: false,
-          serviceCount: categoryCounts.get(name) || 0
-        })
-      }
-    })
-
-    const mergedCategories = Array.from(categoryMap.values())
-    res.json(mergedCategories)
+    res.json(categoriesWithCounts)
   } catch (error) {
     console.error('Error loading categories:', error)
     res.status(500).json({ error: 'Failed to load categories' })
@@ -930,48 +952,44 @@ app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, doubleCsrf
       return res.status(400).json({ error: 'Category name is required' })
     }
 
+    // Get the category to find its ID
+    const category = await getCategoryByName(categoryName)
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' })
+    }
+
     // Load services data
     const { manualServices, overrides } = await loadServicesData()
 
-    // Remove category from manual services
+    // Remove category ID from manual services
     let manualServicesChanged = false
     manualServices.forEach(service => {
-      if (Array.isArray(service.categories)) {
-        const originalLength = service.categories.length
-        service.categories = service.categories.filter(cat => cat !== categoryName)
-        if (service.categories.length !== originalLength) {
+      if (Array.isArray(service.categoryIds)) {
+        const originalLength = service.categoryIds.length
+        service.categoryIds = service.categoryIds.filter(id => id !== category.id)
+        if (service.categoryIds.length !== originalLength) {
           manualServicesChanged = true
         }
         // If no categories left, remove the field
-        if (service.categories.length === 0) {
-          delete service.categories
+        if (service.categoryIds.length === 0) {
+          delete service.categoryIds
         }
-      }
-      // Also handle old single category field
-      if (service.category === categoryName) {
-        delete service.category
-        manualServicesChanged = true
       }
     })
 
-    // Remove category from overrides
+    // Remove category ID from overrides
     let overridesChanged = false
     Object.values(overrides).forEach(override => {
-      if (Array.isArray(override.categories)) {
-        const originalLength = override.categories.length
-        override.categories = override.categories.filter(cat => cat !== categoryName)
-        if (override.categories.length !== originalLength) {
+      if (Array.isArray(override.categoryIds)) {
+        const originalLength = override.categoryIds.length
+        override.categoryIds = override.categoryIds.filter(id => id !== category.id)
+        if (override.categoryIds.length !== originalLength) {
           overridesChanged = true
         }
         // If no categories left, remove the field
-        if (override.categories.length === 0) {
-          delete override.categories
+        if (override.categoryIds.length === 0) {
+          delete override.categoryIds
         }
-      }
-      // Also handle old single category field
-      if (override.category === categoryName) {
-        delete override.category
-        overridesChanged = true
       }
     })
 
@@ -980,16 +998,8 @@ app.post('/api/admin/categories/delete', apiRateLimiter, requireAuth, doubleCsrf
       await saveServicesData(manualServices, overrides)
     }
 
-    // Also remove from configured categories in config
-    const configData = await fs.readFile(CONFIG_PATH, 'utf-8')
-    const config = JSON.parse(configData)
-    if (config.categories) {
-      const originalLength = config.categories.length
-      config.categories = config.categories.filter(cat => cat.name !== categoryName)
-      if (config.categories.length !== originalLength) {
-        await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
-      }
-    }
+    // Delete category from category manager
+    await deleteCategory(category.id)
 
     res.json({ success: true, message: 'Category deleted from all services' })
   } catch (error) {
@@ -1065,6 +1075,39 @@ app.put('/api/admin/config', writeRateLimiter, doubleCsrfProtection, requireAuth
   try {
     const config = req.body
 
+    // Extract and handle categories separately
+    const configuredCategories = config.categories || []
+    delete config.categories // Remove from config before saving
+
+    // Update categories in category manager
+    if (configuredCategories.length > 0) {
+      const allCategories = await loadCategories()
+      const categoryMap = new Map(allCategories.map(cat => [cat.name.toLowerCase(), cat]))
+
+      // Update or create categories
+      for (const cat of configuredCategories) {
+        const normalizedName = cat.name.toLowerCase()
+        const existing = categoryMap.get(normalizedName)
+
+        if (existing) {
+          // Update existing category
+          await updateCategory(existing.id, {
+            displayName: cat.displayName || cat.name,
+            visible: cat.visible !== false,
+            configured: true
+          })
+        } else {
+          // Create new category
+          await getOrCreateCategory(cat.name, {
+            displayName: cat.displayName || cat.name,
+            visible: cat.visible !== false,
+            configured: true,
+            source: 'manual'
+          })
+        }
+      }
+    }
+
     // Validate NPM connections if enabled
     const validationResults = []
     if (config.npmEnabled && config.npmConnections && config.npmConnections.length > 0) {
@@ -1083,7 +1126,7 @@ app.put('/api/admin/config', writeRateLimiter, doubleCsrfProtection, requireAuth
       }
     }
 
-    // Save config
+    // Save config (without categories field)
     await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
 
     // Trigger NPM fetch on the main server if NPM is enabled
