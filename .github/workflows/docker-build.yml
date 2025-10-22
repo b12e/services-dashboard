@@ -81,15 +81,16 @@ jobs:
           echo "Image digest: ${{ steps.build.outputs.digest }}"
 
       # Sync README.md to Docker Hub when merging to main
-      # This ensures the Docker Hub description stays up-to-date with the GitHub README
-      - name: Update Docker Hub README
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE_NAME }}
-          readme-filepath: ./README.md
+      # Disabled: Docker Hub API requires additional permissions beyond standard PAT
+      # Update the description manually from https://hub.docker.com/repository/docker/b12e/services-dashboard
+      # - name: Update Docker Hub README
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   uses: peter-evans/dockerhub-description@v4
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     repository: ${{ env.IMAGE_NAME }}
+      #     readme-filepath: ./README.md
 
       - name: Delete PR tag from Docker Hub after merge
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
