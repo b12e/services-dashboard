@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Services-Dashboard</Name>
+  <Repository>b12e/services-dashboard:latest</Repository>
+  <Registry>https://hub.docker.com/r/b12e/services-dashboard</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/b12e/selfhosted-shortcuts</Support>
+  <Project>https://github.com/b12e/selfhosted-shortcuts</Project>
+  <Overview>A dark-themed dashboard for self-hosted services with NPM auto-discovery and PWA support. Automatically discovers services from Nginx Proxy Manager and provides a clean interface to access your self-hosted applications.</Overview>
+  <Category>Tools: Network:Web Status:Stable</Category>
+  <WebUI>http://[IP]:[PORT:3000]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/b12e/selfhosted-shortcuts/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/b12e/selfhosted-shortcuts/refs/heads/main/public/icon.svg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Dashboard Port" Target="3000" Default="3000" Mode="tcp" Description="Port for the main dashboard interface" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Admin Panel Port" Target="3001" Default="3001" Mode="tcp" Description="Port for the admin configuration panel" Type="Port" Display="always" Required="true" Mask="false">3001</Config>
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/services-dashboard" Mode="rw" Description="Directory where all configuration files are stored (services.json, config.json, auth.json)" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/services-dashboard</Config>
+  <Config Name="Admin Username" Target="ADMIN_USERNAME" Default="" Mode="" Description="Admin panel username. Leave empty to disable authentication." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Admin Password" Target="ADMIN_PASSWORD" Default="" Mode="" Description="Admin panel password. Only used if ADMIN_USERNAME is set." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+</Container>
