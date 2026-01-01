@@ -16,7 +16,7 @@
     "@simplewebauthn/server": "^13.2.2",
     "cookie-parser": "^1.4.7",
     "csrf-csrf": "^4.0.3",
-    "express": "^4.18.2",
+    "express": "^4.22.1",
     "express-rate-limit": "^8.1.0",
     "express-session": "^1.18.2",
     "multer": "^2.0.2",
