@@ -1,232 +1,106 @@
 /**
- * Auto-categorization utility for services
- * Analyzes service names to determine the most appropriate category
+ * Auto-categorization of services
+ *
+ * Signals, strongest first:
+ *   1. A known app name in the service name, hostname or matched icon
+ *      ("Sonarr 4K", "qbit.example.com", icon "home-assistant")
+ *   2. Generic keywords in the name, description or hostname ("TV Shows")
+ *   3. Categories from the matched icon's metadata
+ *
+ * Matching works on whole names and words, never on arbitrary substrings.
+ * The result is a single built-in category key, or null when nothing fits.
  */
 
-const categoryKeywords = {
-  'Media': [
-    // *arr stack
-    'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr', 'prowlarr',
-    'whisparr', 'jonarr',
-    // Request management
-    'overseerr', 'ombi', 'petio', 'requestrr',
-    // Statistics & tracking
-    'tautulli', 'varken', 'organizr',
-    // Other media tools
-    'mylar', 'lazylibrarian', 'sickchill', 'couchpotato', 'medusa',
-    // Media servers
-    'plex', 'jellyfin', 'emby', 'kodi', 'media server', 'mediaserver',
-    'navidrome', 'airsonic', 'subsonic', 'funkwhale', 'ampache',
-    'streama', 'dim', 'gerbera', 'minidlna',
-    // Written media
-      'calibre', 'calibre-web', 'kavita', 'komga', 'ubooquity', 'audiobookshelf',
-    'readarr', 'bookstack', 'lazylibrarian', 'mylar', 'mango', 'tanoshi'
-  ],
-  'Download-Managers': [
-    // BitTorrent
-    'qbittorrent', 'transmission', 'deluge', 'rtorrent', 'rutorrent',
-    'flood', 'torrentbox', 'ktorrent', 'utorrent', 'bittorrent',
-    // Usenet
-    'sabnzbd', 'nzbget', 'nzbhydra', 'nzbhydra2',
-    // General
-    'jdownloader', 'pyload', 'aria2', 'youtube-dl', 'yt-dlp', 'tubesync',
-    // Arr stack because they also manage downloads
-    'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr', 'prowlarr',
-    'whisparr', 'jonarr',
-  ],
-  'Photos': [
-    'photoprism', 'immich', 'piwigo', 'lychee', 'photoview', 'photostructure',
-    'pigallery', 'chevereto', 'librephotos', 'ownphotos', 'photos',
-    'pixelfed', 'memories', 'photoview'
-  ],
-  'Productivity': [
-    // Cloud storage
-    'nextcloud', 'owncloud', 'seafile', 'filerun', 'filebrowser', 'syncthing',
-    // Password managers
-    'bitwarden', 'vaultwarden', 'passbolt', 'psono', 'keepass', 'passit',
-    // Note taking & wiki
-    'bookstack', 'wiki.js', 'dokuwiki', 'outline', 'hedgedoc', 'notion',
-    'joplin', 'trilium', 'standardnotes', 'carnet', 'memos',
-    // Documents
-    'paperless', 'paperless-ngx', 'papermerge', 'mayan', 'teedy', 'docspell',
-    // Office suites
-    'onlyoffice', 'collabora', 'cryptpad', 'etherpad', 'hedgedoc',
-    // Task management
-    'vikunja', 'wekan', 'kanboard', 'planka', 'focalboard', 'tasks', 'todo'
-  ],
-  'Workflow-Automation': [
-    'n8n', 'nodered', 'node-red', 'huginn', 'activepieces', 'automatisch',
-    'windmill', 'activepieces', 'trigger', 'workflow', 'automation', 'integration'
-  ],
-  'Finance': [
-    'firefly', 'firefly-iii', 'actual', 'budget', 'budge', 'ghostfolio',
-    'maybe', 'lunch money', 'invoice', 'invoiceninja', 'invoice ninja',
-    'crater', 'akaunting', 'finance', 'accounting', 'expenses'
-  ],
-  'Monitoring-Tools': [
-    'grafana', 'prometheus', 'uptime-kuma', 'uptime', 'kuma', 'statping',
-    'gatus', 'vigil', 'healthchecks', 'cstate', 'cachet',
-    'netdata', 'glances', 'scrutiny', 'librespeed', 'speedtest',
-    'monitorr', 'logarr', 'dockprom', 'monitor', 'status'
-  ],
-  'Logging-Metrics': [
-    'influxdb', 'telegraf', 'victoria', 'timescale', 'questdb',
-    'loki', 'promtail', 'elasticsearch', 'logstash', 'graylog',
-    'seq', 'dozzle', 'logs'
-  ],
-  'Analytics': [
-    'matomo', 'plausible', 'umami', 'ackee', 'shynet', 'offen',
-    'posthog', 'metabase', 'superset', 'analytics', 'stats', 'statistics'
-  ],
-  'Networking-Tools': [
-    // Reverse proxies
-    'nginx', 'nginx proxy manager', 'npm', 'traefik', 'caddy', 'haproxy',
-    'swag', 'linuxserver',
-    // VPN
-    'wireguard', 'openvpn', 'tailscale', 'headscale', 'zerotier', 'netbird',
-    'pritunl', 'softether',
-    // Network tools
-    'speedtest', 'librespeed', 'smokeping', 'netbox', 'phpipam',
-    'gateway', 'router',
-    // DNS & Adblock
-     'pihole', 'pi-hole', 'adguard', 'adguard home', 'blocky', 'technitium',
-    'dns', 'adblock', 'ad-block'
-  ],
-  'Security': [
-    'authentik', 'authelia', 'keycloak', 'lldap', 'openldap', 'glauth',
-    'oauth', 'sso', 'ldap', 'saml', 'oidc',
-    'vault', 'hashicorp', 'auth', 'authentication',
-    // Security monitoring
-    'fail2ban', 'crowdsec', 'wazuh', 'ossec', 'security'
-  ],
-  'Development': [
-    // Git
-    'github', 'gitlab', 'gitea', 'gogs', 'forgejo', 'radicle',
-    // CI/CD
-    'jenkins', 'drone', 'woodpecker', 'concourse', 'buildbot', 'ci/cd', 'cicd',
-    // Container management
-    'portainer', 'yacht', 'docker', 'kubernetes', 'k8s', 'rancher', 'lens',
-    // IDEs
-    'code-server', 'vscode', 'theia', 'coder', 'gitpod',
-    // Package registries
-    'registry', 'harbor', 'nexus', 'artifactory', 'verdaccio',
-    // Databases
-    'postgres', 'mysql', 'mariadb', 'mongodb', 'redis', 'adminer', 'phpmyadmin',
-    // Dev tools
-    'git', 'swagger', 'api', 'postman', 'hoppscotch'
-  ],
-  'Home-Automation': [
-    'home assistant', 'homeassistant', 'hass', 'openhab', 'domoticz',
-    'home-assistant', 'ha', 'homebridge', 'hoobs',
-    // IoT protocols
-    'mqtt', 'mosquitto', 'zigbee', 'zigbee2mqtt', 'z2m', 'zwave', 'zwavejs',
-    'esphome', 'tasmota', 'shelly', 'tuya', 'smartthings',
-    // Integrations
-    'node-red', 'nodered', 'deconz', 'zwavejs', 'frigate', 'scrypted',
-    'homekit', 'hubitat', 'iot', 'automation', 'smart home', 'smarthome'
-  ],
-  'Food-Recipe': [
-    'mealie', 'tandoor', 'grocy', 'recipes', 'nextcloud cookbook',
-    'recipe', 'cookbook', 'groceries', 'shopping'
-  ],
-  'Communication': [
-    // Chat
-    'discord', 'slack', 'mattermost', 'rocket.chat', 'rocketchat', 'matrix',
-    'synapse', 'element', 'revolt', 'zulip', 'mumble', 'teamspeak',
-    // Video conference
-    'jitsi', 'jitsi meet', 'bigbluebutton', 'bbb',
-    // Email
-    'mailcow', 'mailu', 'mail-in-a-box', 'postal', 'poste.io', 'iredmail',
-    'roundcube', 'rainloop', 'snappymail', 'email', 'mail', 'smtp',
-    // General
-    'chat', 'messaging', 'forum', 'discourse', 'flarum'
-  ],
-  'Gaming': [
-    'minecraft', 'steam', 'game', 'gaming', 'pterodactyl', 'amp', 'gameserver',
-    'valheim', 'terraria', 'factorio', 'satisfactory', 'palworld',
-    'craftybytes', 'crafty', 'cubecoders', 'linuxgsm', 'gameservers'
-  ],
-  'Backup-and-storage': [
-    'minio', 's3', 'garage', 'seaweedfs', 'ceph', 'gluster',
-    'nfs', 'samba', 'webdav', 'storage', 'files', 'duplicati', 'duplicacy', 'restic', 'borg', 'borgmatic', 'kopia',
-    'syncthing', 'rsync', 'rclone', 'backup', 'sync'
-  ],
-  'System-Management': [
-    'cockpit', 'webmin', 'ajenti', 'yunohost', 'cloudron', 'caprover',
-    'coolify', 'easypanel', 'portainer', 'unraid', 'truenas', 'openmediavault',
-    'omv', 'panel', 'admin', 'dashboard'
-  ],
-  'Dashboards': [
-    'homer', 'heimdall', 'homarr', 'flame', 'organizr', 'dashboard',
-    'dashy', 'fenrus', 'jump', 'homepage', 'sui', 'heimdall'
-  ]
+import { BUILTIN_CATEGORIES, APP_ABBREVIATIONS, EXTERNAL_CATEGORY_MAP, AMBIGUOUS_NAMES } from './taxonomy.js'
+import { normalize, splitWords, candidatesFor, hostLabel } from './text.js'
+
+const APP_INDEX = new Map()
+const KEYWORD_INDEX = new Map()
+
+for (const category of BUILTIN_CATEGORIES) {
+  for (const app of category.apps) {
+    const key = normalize(app)
+    if (!APP_INDEX.has(key)) APP_INDEX.set(key, { category: category.key, app })
+  }
+  for (const keyword of category.keywords) {
+    const key = normalize(keyword)
+    if (!KEYWORD_INDEX.has(key)) KEYWORD_INDEX.set(key, category.key)
+  }
+}
+
+for (const [abbreviation, app] of Object.entries(APP_ABBREVIATIONS)) {
+  const key = normalize(abbreviation)
+  const target = APP_INDEX.get(normalize(app))
+  if (target && !APP_INDEX.has(key)) APP_INDEX.set(key, target)
+}
+
+const VARIANT_SUFFIX = /-(light|dark|alt|white|black|color|colour|mono|wordmark)$/i
+
+function findApp(text) {
+  for (const candidate of candidatesFor(text)) {
+    const hit = APP_INDEX.get(candidate.key)
+    if (!hit) continue
+    if (AMBIGUOUS_NAMES.has(candidate.key) && candidate.kind !== 'full') continue
+    return { ...hit, match: candidate.key }
+  }
+  return null
 }
 
 /**
- * Automatically categorizes a service based on its name
- * Returns ALL matching categories (can be multiple)
- * @param {string} serviceName - The name of the service
- * @returns {Array<string>} - Array of category names
+ * @param {object} input
+ * @param {string}   [input.name]
+ * @param {string}   [input.description]
+ * @param {string[]} [input.hostnames]      hostnames or URLs (domain, forward host)
+ * @param {string}   [input.iconName]       resolved icon name, e.g. "sonarr"
+ * @param {string[]} [input.iconCategories] categories from icon metadata
+ * @returns {{ key: string, source: string, match: string } | null}
  */
-export function autoCategorizeName(serviceName) {
-  if (!serviceName) return []
+export function autoCategorize({ name, description, hostnames = [], iconName, iconCategories = [] } = {}) {
+  const labels = hostnames.map(hostLabel).filter(Boolean)
+  const cleanIcon = typeof iconName === 'string' && !/^(https?:)?\//i.test(iconName)
+    ? iconName.replace(/^si:/, '').replace(VARIANT_SUFFIX, '')
+    : null
 
-  const lowerName = serviceName.toLowerCase()
-  const matchedCategories = []
+  // 1. Known apps
+  for (const text of [name, ...labels, cleanIcon]) {
+    if (!text) continue
+    const hit = findApp(text)
+    if (hit) return { key: hit.category, source: 'app', match: hit.app }
+  }
 
-  // Check each category's keywords
-  for (const [category, keywords] of Object.entries(categoryKeywords)) {
-    for (const keyword of keywords) {
-      if (lowerName.includes(keyword)) {
-        matchedCategories.push(category)
-        break // Don't add the same category twice
-      }
+  // 2. Generic keywords, by vote (name counts double)
+  const votes = new Map()
+  const vote = (text, weight) => {
+    for (const word of splitWords(text)) {
+      const key = KEYWORD_INDEX.get(word)
+      if (key) votes.set(key, { score: (votes.get(key)?.score || 0) + weight, match: votes.get(key)?.match || word })
     }
   }
+  vote(name, 2)
+  vote(description, 1)
+  labels.forEach(label => vote(label, 1))
+  const keywordWinner = pickWinner(votes)
+  if (keywordWinner) return { key: keywordWinner.key, source: 'keyword', match: keywordWinner.match }
 
-  return matchedCategories
+  // 3. Icon metadata categories
+  const metaVotes = new Map()
+  iconCategories.forEach((category, index) => {
+    const key = EXTERNAL_CATEGORY_MAP[String(category).toLowerCase()]
+    if (!key) return
+    // Earlier categories are usually the most specific ones
+    const weight = 1 + 1 / (index + 1)
+    metaVotes.set(key, { score: (metaVotes.get(key)?.score || 0) + weight, match: category })
+  })
+  const metaWinner = pickWinner(metaVotes)
+  if (metaWinner) return { key: metaWinner.key, source: 'icon-metadata', match: metaWinner.match }
+
+  return null
 }
 
-/**
- * Categorizes a service, using the provided categories or auto-detecting
- * Priority order:
- * 1. Manual categories from services.json
- * 2. Auto-categorize from name (categorize.js keywords)
- * 3. Homarr-labs icon metadata categories (fallback)
- * 4. "Other" if nothing matches
- *
- * @param {Object} service - The service object
- * @returns {Array<string>} - Array of category names
- */
-export function categorizeService(service) {
-  const categories = []
-
-  // Priority 1: Check for manual category (single string - legacy)
-  if (service.category && typeof service.category === 'string' && service.category.trim() !== '') {
-    categories.push(service.category)
+function pickWinner(votes) {
+  let winner = null
+  for (const [key, { score, match }] of votes) {
+    if (!winner || score > winner.score) winner = { key, score, match }
   }
-
-  // Priority 1: Check for manual categories array
-  if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
-    categories.push(...service.categories)
-  }
-
-  // If manual categories were provided, use only those
-  if (categories.length > 0) {
-    return [...new Set(categories)]
-  }
-
-  // Priority 2: Auto-categorize based on name (categorize.js)
-  const autoCategories = autoCategorizeName(service.name)
-  if (autoCategories.length > 0) {
-    return autoCategories
-  }
-
-  // Priority 3: Use suggested categories from icon metadata (homarr-labs) as fallback
-  if (service._suggestedCategories && Array.isArray(service._suggestedCategories) && service._suggestedCategories.length > 0) {
-    return [...new Set(service._suggestedCategories)]
-  }
-
-  // Priority 4: Default to "Other" if nothing matches
-  return ['Other']
+  return winner
 }

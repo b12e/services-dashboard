@@ -2,19 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// In development, API calls go to the dashboard server (npm run server)
+const apiTarget = process.env.API_TARGET || 'http://localhost:3000'
+
 export default defineConfig({
   server: {
     proxy: {
-      '/services.json': {
-        target: 'https://dashboard.local.b12e.es',
-        changeOrigin: true,
-        secure: false
-      },
-      '/configuration.json': {
-        target: 'https://dashboard.local.b12e.es',
-        changeOrigin: true,
-        secure: false
-      }
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/uploads': { target: apiTarget, changeOrigin: true },
     }
   },
   plugins: [
@@ -32,26 +27,34 @@ export default defineConfig({
         icons: [
           {
             src: 'icon.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml'
-          },
-          {
-            src: 'icon.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml'
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any'
           }
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
         runtimeCaching: [
+          {
+            // Last known services, so the installed app still opens offline
+            urlPattern: ({ url }) => url.pathname === '/api/public/dashboard',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'dashboard-data',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 1 },
+              cacheableResponse: { statuses: [200] }
+            }
+          },
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/gh\/homarr-labs\/dashboard-icons\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'dashboard-icons-cache',
               expiration: {
-                maxEntries: 100,
+                maxEntries: 500,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               },
               cacheableResponse: {
@@ -60,16 +63,16 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/simple-icons@latest\/icons\/.*/i,
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/icons/si/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'simple-icons-cache',
               expiration: {
-                maxEntries: 100,
+                maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               },
               cacheableResponse: {
-                statuses: [0, 200]
+                statuses: [200]
               }
             }
           }

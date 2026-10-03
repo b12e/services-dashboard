@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { startRegistration } from '@simplewebauthn/browser'
-import { fetchWithCsrf } from '../utils/csrf'
+import { api } from '../utils/csrf'
 
 function PasskeyManager() {
   const [passkeys, setPasskeys] = useState([])
@@ -15,11 +15,7 @@ function PasskeyManager() {
 
   async function loadPasskeys() {
     try {
-      const response = await fetch('/api/admin/auth/passkeys')
-      if (response.ok) {
-        const data = await response.json()
-        setPasskeys(data)
-      }
+      setPasskeys(await api('/api/admin/auth/passkeys'))
     } catch (err) {
       console.error('Failed to load passkeys:', err)
     } finally {
@@ -37,35 +33,15 @@ function PasskeyManager() {
     setError('')
 
     try {
-      // Get registration options
-      const optionsResponse = await fetchWithCsrf('/api/admin/auth/passkeys/register/options', {
-        method: 'POST'
-      })
-
-      if (!optionsResponse.ok) {
-        throw new Error('Failed to get registration options')
-      }
-
-      const options = await optionsResponse.json()
-
-      // Start registration
-      const credential = await startRegistration(options)
-
-      // Verify registration
-      const verifyResponse = await fetchWithCsrf('/api/admin/auth/passkeys/register/verify', {
+      const options = await api('/api/admin/auth/passkeys/register/options', { method: 'POST' })
+      const credential = await startRegistration({ optionsJSON: options })
+      await api('/api/admin/auth/passkeys/register/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential, name: passkeyName })
+        body: { credential, name: passkeyName }
       })
-
-      if (verifyResponse.ok) {
-        setPasskeyName('')
-        await loadPasskeys()
-        alert('Passkey registered successfully!')
-      } else {
-        const data = await verifyResponse.json()
-        setError(data.error || 'Registration failed')
-      }
+      setPasskeyName('')
+      await loadPasskeys()
+      alert('Passkey registered successfully!')
     } catch (err) {
       console.error('Passkey registration error:', err)
       setError(err.message || 'Failed to register passkey')
@@ -74,24 +50,16 @@ function PasskeyManager() {
     }
   }
 
-  async function handleDeletePasskey(index) {
-    if (!confirm('Are you sure you want to delete this passkey?')) {
+  async function handleDeletePasskey(passkey) {
+    if (!confirm(`Delete the passkey "${passkey.name}"?`)) {
       return
     }
 
     try {
-      const response = await fetchWithCsrf(`/api/admin/auth/passkeys/${index}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await loadPasskeys()
-      } else {
-        alert('Failed to delete passkey')
-      }
+      await api(`/api/admin/auth/passkeys/${encodeURIComponent(passkey.id)}`, { method: 'DELETE' })
+      await loadPasskeys()
     } catch (err) {
-      console.error('Failed to delete passkey:', err)
-      alert('Failed to delete passkey')
+      alert(`Failed to delete passkey: ${err.message}`)
     }
   }
 
@@ -132,8 +100,8 @@ function PasskeyManager() {
         {passkeys.length === 0 ? (
           <p className="empty-state">No passkeys registered yet</p>
         ) : (
-          passkeys.map((passkey, index) => (
-            <div key={index} className="passkey-item">
+          passkeys.map((passkey) => (
+            <div key={passkey.id} className="passkey-item">
               <div className="passkey-info">
                 <strong>{passkey.name}</strong>
                 <span className="passkey-date">
@@ -141,7 +109,7 @@ function PasskeyManager() {
                 </span>
               </div>
               <button
-                onClick={() => handleDeletePasskey(index)}
+                onClick={() => handleDeletePasskey(passkey)}
                 className="btn-danger btn-small"
               >
                 Delete

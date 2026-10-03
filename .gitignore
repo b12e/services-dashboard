@@ -6,6 +6,10 @@ dist/
 build/
 admin-dist/
 
+# Runtime data and downloaded icon metadata
+data/
+server/vendor/
+
 # Environment variables
 .env
 .env.local

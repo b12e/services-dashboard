@@ -3,13 +3,19 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.10"
+  },
   "scripts": {
+    "start": "node server/start.js",
+    "server": "node server/index.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "admin:dev": "vite --config vite.admin.config.js",
     "admin:build": "vite build --config vite.admin.config.js",
-    "admin:server": "node admin-server.js"
+    "admin:server": "node admin-server.js",
+    "test": "node --test test/"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.2.2",

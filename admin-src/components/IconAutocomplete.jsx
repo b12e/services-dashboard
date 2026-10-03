@@ -1,222 +1,160 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
-// Simple component to display icon preview
-function IconPreview({ iconName, className = "icon-suggestion-preview" }) {
-  const [iconUrl, setIconUrl] = useState(null)
-  const [source, setSource] = useState(null)
+const RESULT_LIMIT = 120
 
-  useEffect(() => {
-    if (!iconName) return
-
-    async function loadPreview() {
-      try {
-        const response = await fetch(`/api/icons/preview/${encodeURIComponent(iconName)}`)
-        if (response.ok) {
-          const data = await response.json()
-          setIconUrl(data.url)
-          setSource(data.source)
-        }
-      } catch (error) {
-        console.error('Failed to load icon preview:', error)
-      }
-    }
-
-    loadPreview()
-  }, [iconName])
-
-  if (!iconUrl) return null
-
-  return (
-    <img
-      src={iconUrl}
-      alt={iconName}
-      className={className}
-      data-source={source}
-      onError={(e) => e.target.style.display = 'none'}
-    />
-  )
+// Shared between all forms, the list only changes when the server restarts
+let iconsPromise = null
+function loadIcons() {
+  if (!iconsPromise) {
+    iconsPromise = fetch('/api/icons')
+      .then(response => (response.ok ? response.json() : []))
+      .catch(() => [])
+      .then(icons => {
+        if (icons.length === 0) iconsPromise = null
+        return icons
+      })
+  }
+  return iconsPromise
 }
 
-function IconAutocomplete({ value, onChange, placeholder }) {
+function normalize(str) {
+  return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isCustomUrl(value) {
+  return /^https?:\/\//i.test(value) || value.startsWith('/uploads/')
+}
+
+/**
+ * Rank icons for a search term: exact name, then prefix, then contains,
+ * then title/alias matches. Dashboard icons first on ties (they are coloured).
+ */
+function rankIcons(icons, term) {
+  const query = normalize(term)
+  if (!query) return icons
+  const ranked = []
+  for (const icon of icons) {
+    const name = normalize(icon.name.replace(/^si:/, ''))
+    const title = normalize(icon.title)
+    let score = 0
+    if (name === query || title === query) score = 100
+    else if (name.startsWith(query) || title.startsWith(query)) score = 80 - Math.min(name.length - query.length, 30) / 2
+    else if (name.includes(query) || title.includes(query)) score = 50
+    else if (icon.aliases?.some(alias => normalize(alias).includes(query))) score = 30
+    else if (icon.categories?.some(cat => normalize(cat).includes(query))) score = 10
+    if (score > 0) ranked.push({ icon, score: score + (icon.source === 'dashboard-icons' ? 1 : 0) })
+  }
+  return ranked.sort((a, b) => b.score - a.score).map(r => r.icon)
+}
+
+function prettyCategory(category) {
+  return category.replace(/-/g, ' ').replace(/^\w/, c => c.toUpperCase())
+}
+
+function IconAutocomplete({ value, onChange, placeholder, autoIcon }) {
   const [icons, setIcons] = useState([])
-  const [inputValue, setInputValue] = useState(value || '')
   const [showModal, setShowModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedSource, setSelectedSource] = useState('all')
-  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
-  const [categories, setCategories] = useState([])
-  const [filteredIcons, setFilteredIcons] = useState([])
-  const [iconPreviewUrl, setIconPreviewUrl] = useState(null)
-  const [iconPreviewCache, setIconPreviewCache] = useState(new Map())
-  const wrapperRef = useRef(null)
+  const [viewMode, setViewMode] = useState('grid')
+  const [resolvedPreview, setResolvedPreview] = useState(null)
 
   useEffect(() => {
-    loadIcons()
+    loadIcons().then(setIcons)
   }, [])
 
+  const byName = useMemo(() => new Map(icons.map(icon => [icon.name, icon])), [icons])
+
+  // Preview for the current value: from the list, a custom URL, or the
+  // server's fuzzy resolution ("Home Assistant" -> home-assistant)
+  const listedPreview = value ? byName.get(value)?.url || (isCustomUrl(value) ? value : null) : null
   useEffect(() => {
-    setInputValue(value || '')
-    if (value) {
-      loadIconPreview(value)
-    }
-  }, [value])
-
-  async function loadIconPreview(iconName) {
-    if (!iconName) {
-      setIconPreviewUrl(null)
-      return
-    }
-
-    // Check cache first
-    if (iconPreviewCache.has(iconName)) {
-      setIconPreviewUrl(iconPreviewCache.get(iconName))
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/icons/preview/${encodeURIComponent(iconName)}`)
-      if (response.ok) {
-        const data = await response.json()
-        setIconPreviewUrl(data.url)
-        setIconPreviewCache(new Map(iconPreviewCache).set(iconName, data.url))
-      } else {
-        setIconPreviewUrl(null)
+    setResolvedPreview(null)
+    if (!value || listedPreview) return
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/icons/preview/${encodeURIComponent(value)}`)
+        if (response.ok) setResolvedPreview((await response.json()).url)
+      } catch {
+        // No preview
       }
-    } catch (error) {
-      console.error('Failed to load icon preview:', error)
-      setIconPreviewUrl(null)
-    }
-  }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [value, listedPreview])
+  const previewUrl = value ? listedPreview || resolvedPreview : autoIcon?.url
 
-
-  async function loadIcons() {
-    try {
-      // Use relative URL to avoid hardcoded localhost (prevents SSRF)
-      const response = await fetch('/api/icons')
-      if (response.ok) {
-        const data = await response.json()
-        setIcons(data)
-
-        // Extract unique categories
-        const allCategories = new Set()
-        data.forEach(icon => {
-          if (icon.categories && Array.isArray(icon.categories)) {
-            icon.categories.forEach(cat => allCategories.add(cat))
-          }
-        })
-        setCategories(Array.from(allCategories).sort())
+  // Icon metadata uses inconsistent category spellings ("media", "Media")
+  const categories = useMemo(() => {
+    const counts = new Map()
+    for (const icon of icons) {
+      for (const category of icon.categories || []) {
+        const key = category.toLowerCase()
+        const entry = counts.get(key) || { key, label: prettyCategory(category), count: 0 }
+        entry.count++
+        counts.set(key, entry)
       }
-    } catch (error) {
-      console.error('Failed to load icons:', error)
     }
-  }
+    return [...counts.values()].sort((a, b) => a.label.localeCompare(b.label))
+  }, [icons])
 
-  // Normalize string for fuzzy matching (remove spaces, hyphens, underscores)
-  function normalizeForSearch(str) {
-    return str.toLowerCase().replace(/[\s\-_]/g, '')
-  }
-
-  // Check if search term matches text with fuzzy matching
-  function fuzzyMatch(text, searchTerm) {
-    const normalizedText = normalizeForSearch(text)
-    const normalizedSearch = normalizeForSearch(searchTerm)
-    return normalizedText.includes(normalizedSearch)
-  }
-
-  // Filter icons based on search, category, and source
-  useEffect(() => {
+  const filteredIcons = useMemo(() => {
     let filtered = icons
-
-    // Filter by search term with fuzzy matching
-    if (searchTerm) {
-      filtered = filtered.filter(icon => {
-        return fuzzyMatch(icon.name, searchTerm) ||
-               (icon.title && fuzzyMatch(icon.title, searchTerm)) ||
-               (icon.aliases && icon.aliases.some(alias => fuzzyMatch(alias, searchTerm))) ||
-               (icon.categories && icon.categories.some(cat => fuzzyMatch(cat, searchTerm)))
-      })
-    }
-
-    // Filter by category
+    if (selectedSource !== 'all') filtered = filtered.filter(icon => icon.source === selectedSource)
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(icon =>
-        icon.categories && icon.categories.includes(selectedCategory)
-      )
+      filtered = filtered.filter(icon => icon.categories?.some(cat => cat.toLowerCase() === selectedCategory))
     }
-
-    // Filter by source
-    if (selectedSource !== 'all') {
-      filtered = filtered.filter(icon => icon.source === selectedSource)
-    }
-
-    setFilteredIcons(filtered.slice(0, 100)) // Limit to 100 for performance
+    return rankIcons(filtered, searchTerm)
   }, [icons, searchTerm, selectedCategory, selectedSource])
 
-  function handleInputChange(e) {
-    const newValue = e.target.value
-    setInputValue(newValue)
-    onChange(newValue)
-    loadIconPreview(newValue)
-  }
-
   function handleSelectIcon(iconName) {
-    setInputValue(iconName)
     onChange(iconName)
-    loadIconPreview(iconName)
     setShowModal(false)
   }
 
   function openModal() {
     setShowModal(true)
-    setSearchTerm('')
+    setSearchTerm(value && !isCustomUrl(value) ? value.replace(/^si:/, '') : '')
     setSelectedCategory('all')
     setSelectedSource('all')
   }
 
-  function closeModal() {
-    setShowModal(false)
-  }
+  const sourceCount = source => icons.filter(i => i.source === source).length
 
   return (
     <>
-      <div className="icon-autocomplete" ref={wrapperRef}>
+      <div className="icon-autocomplete">
         <div className="icon-input-group">
           <div className="icon-input-wrapper">
-            {iconPreviewUrl && (
+            {previewUrl && (
               <img
-                src={iconPreviewUrl}
+                key={previewUrl}
+                src={previewUrl}
                 alt=""
-                className="icon-preview-input"
-                onError={(e) => e.target.style.display = 'none'}
+                className={`icon-preview-input ${value ? '' : 'icon-preview-auto'}`}
+                onError={(e) => { e.target.style.display = 'none' }}
               />
             )}
             <input
               type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              placeholder={placeholder}
-              className={iconPreviewUrl ? 'has-icon' : ''}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={autoIcon?.name ? `Auto: ${autoIcon.name}` : placeholder}
+              className={previewUrl ? 'has-icon' : ''}
             />
           </div>
-          <button
-            type="button"
-            onClick={openModal}
-            className="btn-browse-icons"
-            title="Browse icons"
-          >
+          <button type="button" onClick={openModal} className="btn-browse-icons" title="Browse icons">
             Browse
           </button>
         </div>
       </div>
 
-      {/* Icon Browser Modal */}
       {showModal && (
-        <div className="icon-modal-overlay" onClick={closeModal}>
+        <div className="icon-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="icon-modal" onClick={(e) => e.stopPropagation()}>
             <div className="icon-modal-header">
               <h3>Choose an Icon</h3>
-              <button type="button" onClick={closeModal} className="icon-modal-close">×</button>
+              <button type="button" onClick={() => setShowModal(false)} className="icon-modal-close" aria-label="Close">×</button>
             </div>
 
             <div className="icon-modal-controls">
@@ -233,96 +171,72 @@ function IconAutocomplete({ value, onChange, placeholder }) {
 
               <div className="icon-filter-group">
                 <label>Source:</label>
-                <select
-                  value={selectedSource}
-                  onChange={(e) => setSelectedSource(e.target.value)}
-                  className="icon-source-select"
-                >
+                <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)} className="icon-source-select">
                   <option value="all">All Sources ({icons.length})</option>
-                  <option value="dashboard-icons">Dashboard Icons ({icons.filter(i => i.source === 'dashboard-icons').length})</option>
-                  <option value="simple-icons">Simple Icons ({icons.filter(i => i.source === 'simple-icons').length})</option>
+                  <option value="dashboard-icons">Dashboard Icons ({sourceCount('dashboard-icons')})</option>
+                  <option value="simple-icons">Simple Icons ({sourceCount('simple-icons')})</option>
                 </select>
               </div>
 
               <div className="icon-filter-group">
                 <label>Category:</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="icon-category-select"
-                >
-                  <option value="all">All ({icons.length})</option>
-                  {categories.map(cat => {
-                    const count = icons.filter(icon =>
-                      icon.categories && icon.categories.includes(cat)
-                    ).length
-                    return (
-                      <option key={cat} value={cat}>
-                        {cat} ({count})
-                      </option>
-                    )
-                  })}
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="icon-category-select">
+                  <option value="all">All</option>
+                  {categories.map(cat => (
+                    <option key={cat.key} value={cat.key}>{cat.label} ({cat.count})</option>
+                  ))}
                 </select>
               </div>
 
               <div className="icon-view-toggle">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={viewMode === 'grid' ? 'active' : ''}
-                  title="Grid view"
-                >
-                  ⊞
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'active' : ''}
-                  title="List view"
-                >
-                  ☰
-                </button>
+                <button type="button" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'active' : ''} title="Grid view">⊞</button>
+                <button type="button" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'active' : ''} title="List view">☰</button>
               </div>
             </div>
 
             <div className="icon-modal-body">
               <div className="icon-results-info">
-                Showing {filteredIcons.length} icon{filteredIcons.length !== 1 ? 's' : ''}
+                {filteredIcons.length > RESULT_LIMIT
+                  ? `Showing ${RESULT_LIMIT} of ${filteredIcons.length} icons, refine your search to see more`
+                  : `Showing ${filteredIcons.length} icon${filteredIcons.length !== 1 ? 's' : ''}`}
               </div>
 
-              {filteredIcons.length === 0 ? (
-                <div className="no-icons-found">
-                  <p>No icons found matching your search.</p>
-                </div>
+              {icons.length === 0 ? (
+                <div className="no-icons-found"><p>Loading icons...</p></div>
+              ) : filteredIcons.length === 0 ? (
+                <div className="no-icons-found"><p>No icons found matching your search.</p></div>
               ) : (
                 <div className={`icon-grid ${viewMode}`}>
-                  {filteredIcons.map((icon, index) => (
-                    <div
-                      key={`${icon.source}-${icon.name}-${index}`}
-                      className="icon-grid-item"
+                  {filteredIcons.slice(0, RESULT_LIMIT).map(icon => (
+                    <button
+                      type="button"
+                      key={icon.name}
+                      className={`icon-grid-item ${icon.name === value ? 'selected' : ''}`}
                       onClick={() => handleSelectIcon(icon.name)}
-                      title={icon.name}
+                      title={icon.title ? `${icon.title} (${icon.name})` : icon.name}
                     >
                       <div className="icon-grid-preview">
-                        <IconPreview iconName={icon.name} className="icon-grid-img" />
+                        <img
+                          src={icon.url}
+                          alt=""
+                          loading="lazy"
+                          className="icon-grid-img"
+                          onError={(e) => { e.target.style.visibility = 'hidden' }}
+                        />
                       </div>
                       {viewMode === 'list' && (
                         <div className="icon-grid-info">
                           <div className="icon-grid-name">
                             {icon.title || icon.name}
-                            {icon.source && (
-                              <span className="icon-source-badge">{icon.source === 'simple-icons' ? 'SI' : 'DI'}</span>
-                            )}
+                            <span className="icon-source-badge">{icon.source === 'simple-icons' ? 'SI' : 'DI'}</span>
                           </div>
                           <div className="icon-grid-slug">{icon.name}</div>
-                          {icon.categories && icon.categories.length > 0 && (
-                            <div className="icon-grid-categories">
-                              {icon.categories.slice(0, 2).join(', ')}
-                            </div>
+                          {icon.categories?.length > 0 && (
+                            <div className="icon-grid-categories">{icon.categories.slice(0, 2).join(', ')}</div>
                           )}
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

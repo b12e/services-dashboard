@@ -6,6 +6,7 @@ yarn-error.log*
 
 # Build output
 dist/
+admin-dist/
 build/
 
 # Git
@@ -25,7 +26,8 @@ build/
 .backup/
 .claude/
 
-# Local config (these will be mounted at runtime)
+# Local config and data (mounted at runtime)
+data/
 public/services.json
 public/configuration.json
 

@@ -5,268 +5,76 @@ import ServicesGrid from './components/ServicesGrid'
 import Sidebar from './components/Sidebar'
 import './App.css'
 
+const ALL = 'all'
+const UNCATEGORIZED = 'uncategorized'
+const DEFAULT_NAME = 'Services Dashboard'
+
+function matchesSearch(service, term) {
+  return [service.name, service.description, service.href, ...(service.categories || [])]
+    .some(value => value && value.toLowerCase().includes(term))
+}
+
 function App() {
-  const [services, setServices] = useState([])
+  const [data, setData] = useState({ branding: null, categories: [], services: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [baseUrl, setBaseUrl] = useState(null)
-  const [npmEnabled, setNpmEnabled] = useState(false)
-  const [configLoaded, setConfigLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState(ALL)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [customName, setCustomName] = useState('Services Dashboard')
-  const [customIcon, setCustomIcon] = useState(null)
-  const [configuredCategories, setConfiguredCategories] = useState([])
 
-  // Load branding from API
   useEffect(() => {
-    async function loadBranding() {
+    async function loadDashboard() {
       try {
-        const response = await fetch('/api/branding')
-        if (response.ok) {
-          const branding = await response.json()
-          setCustomName(branding.customName || 'Services Dashboard')
-          setCustomIcon(branding.customIcon)
-          // Update page title
-          document.title = branding.customName || 'Services Dashboard'
-        }
-      } catch (error) {
-        // Silently fail - will use defaults
-      }
-    }
-    loadBranding()
-  }, [])
-
-  // Load configuration from API
-  useEffect(() => {
-    async function loadConfiguration() {
-      try {
-        const response = await fetch('/api/config')
-        if (response.ok) {
-          const config = await response.json()
-
-          if (config.baseUrl) {
-            setBaseUrl(config.baseUrl)
-          }
-
-          // Check if NPM is enabled (server-side)
-          if (config.npmEnabled) {
-            setNpmEnabled(true)
-          }
-        }
-      } catch (error) {
-        // Silently fail - will use defaults
+        const response = await fetch('/api/public/dashboard')
+        if (!response.ok) throw new Error(`Server returned ${response.status}`)
+        const dashboard = await response.json()
+        setData(dashboard)
+        document.title = dashboard.branding?.customName || DEFAULT_NAME
+      } catch (err) {
+        console.error('Error loading services:', err)
+        setError(err.message)
       } finally {
-        setConfigLoaded(true)
-      }
-    }
-
-    loadConfiguration()
-  }, [])
-
-  // Load configured categories from public API
-  useEffect(() => {
-    async function loadCategories() {
-      try {
-        const response = await fetch('/api/public/categories')
-        if (response.ok) {
-          const categories = await response.json()
-          setConfiguredCategories(categories)
-        }
-      } catch (error) {
-        // Silently fail - will auto-detect from services
-      }
-    }
-    loadCategories()
-  }, [])
-
-  // Load services using public API
-  useEffect(() => {
-    // Wait for configuration to be loaded
-    if (!configLoaded) return
-
-    async function loadServices() {
-      try {
-        // Use the new public API endpoint
-        const response = await fetch('/api/public/services')
-        if (!response.ok) {
-          throw new Error('Failed to load services from API')
-        }
-
-        const servicesData = await response.json()
-
-        if (!Array.isArray(servicesData) || servicesData.length === 0) {
-          throw new Error('No services configured. Visit the admin panel at port 3001 to add services or configure NPM integration.')
-        }
-
-        // Services already come with categories and baseUrl applied from server
-        setServices(servicesData)
-        setLoading(false)
-      } catch (error) {
-        console.error('Error loading services:', error)
-        setError(error.message)
         setLoading(false)
       }
     }
-
-    loadServices()
-  }, [configLoaded, npmEnabled])
-
-  const handleSearch = useCallback((term) => {
-    setSearchTerm(term)
+    loadDashboard()
   }, [])
 
-  const handleCategorySelect = useCallback((category) => {
-    setSelectedCategory(category)
-  }, [])
+  const { services, categories, branding } = data
 
-  const handleMenuToggle = useCallback(() => {
-    setIsMobileMenuOpen(prev => !prev)
-  }, [])
+  // Sidebar entries: all, every category with services, then uncategorized
+  const navigation = useMemo(() => {
+    const uncategorized = services.filter(s => s.categoryIds.length === 0).length
+    return [
+      { id: ALL, name: 'All Services', count: services.length },
+      ...categories.map(c => ({ id: c.id, name: c.name, count: c.serviceCount })),
+      ...(uncategorized > 0 && categories.length > 0
+        ? [{ id: UNCATEGORIZED, name: 'Other', count: uncategorized }]
+        : []),
+    ]
+  }, [services, categories])
 
-  const handleMenuClose = useCallback(() => {
-    setIsMobileMenuOpen(false)
-  }, [])
+  // Fall back to all services if the selected category no longer exists
+  const activeCategory = navigation.some(item => item.id === selectedCategory) ? selectedCategory : ALL
+  const activeLabel = navigation.find(item => item.id === activeCategory)?.name || 'All Services'
 
-  // Calculate category counts using configured categories with display names
-  const categories = useMemo(() => {
-    const counts = { all: services.length }
-    const displayNames = { all: 'All Services' }
-
-    // Build a map of category name to display name from configured categories
-    const categoryDisplayMap = {}
-    const visibleCategoryNames = new Set()
-    configuredCategories.forEach(cat => {
-      categoryDisplayMap[cat.name] = cat.displayName
-      visibleCategoryNames.add(cat.name)
-    })
-
-    // First pass: Count all categories
-    services.forEach(service => {
-      if (service.categories && Array.isArray(service.categories) && service.categories.length > 0) {
-        // If no visible categories configured, treat all service categories as visible
-        // This handles the case where categories haven't loaded yet
-        const hasVisibleCategory = configuredCategories.length === 0 ||
-                                    service.categories.some(cat => visibleCategoryNames.has(cat))
-
-        if (hasVisibleCategory) {
-          // Count categories (either all categories if none configured, or just visible ones)
-          service.categories.forEach(category => {
-            if (configuredCategories.length === 0 || visibleCategoryNames.has(category) || category === 'Other') {
-              counts[category] = (counts[category] || 0) + 1
-              // Use configured display name if available, otherwise use the category name
-              displayNames[category] = categoryDisplayMap[category] || category
-            }
-          })
-        } else {
-          // All categories are hidden, count towards "Other"
-          counts.Other = (counts.Other || 0) + 1
-          displayNames.Other = 'Other'
-        }
-      } else {
-        // Services with no categories count towards "Other"
-        counts.Other = (counts.Other || 0) + 1
-        displayNames.Other = 'Other'
-      }
-    })
-
-    // Second pass: Filter out single-entry categories
-    // BUT keep them if they're the only category for at least one service
-    const filteredCounts = { all: counts.all }
-    const filteredDisplayNames = { all: displayNames.all }
-
-    Object.entries(counts).forEach(([category, count]) => {
-      if (category === 'all') return
-
-      // If category has more than 1 service, always include it
-      if (count > 1) {
-        filteredCounts[category] = count
-        filteredDisplayNames[category] = displayNames[category]
-        return
-      }
-
-      // If category has only 1 service, check if that service has other categories
-      const serviceWithThisCategory = services.find(service =>
-        service.categories && service.categories.includes(category)
-      )
-
-      if (serviceWithThisCategory && serviceWithThisCategory.categories.length === 1) {
-        // This is the only category for this service, so keep it
-        filteredCounts[category] = count
-        filteredDisplayNames[category] = displayNames[category]
-      }
-      // Otherwise, skip this single-entry category
-    })
-
-    // No limit on categories - controlled via admin panel visibility settings
-    return { counts: filteredCounts, displayNames: filteredDisplayNames }
-  }, [services, configuredCategories])
-
-  // Filter and sort services based on search term and category
   const filteredServices = useMemo(() => {
-    let result = [...services]
-
-    // Build set of visible category names for filtering
-    const visibleCategoryNames = new Set(configuredCategories.map(cat => cat.name))
-
-    // Filter by category (services can be in multiple categories)
-    if (selectedCategory !== 'all') {
-      if (selectedCategory === 'Other') {
-        // For "Other", show services that:
-        // 1. Have "Other" as an explicit category, OR
-        // 2. Have no categories at all, OR
-        // 3. Have categories but ALL of them are hidden (when categories are configured)
-        result = result.filter(service => {
-          // Case 1: Explicit "Other" category
-          if (service.categories &&
-              Array.isArray(service.categories) &&
-              service.categories.includes('Other')) {
-            return true
-          }
-
-          // Case 2: No categories at all
-          if (!service.categories ||
-              !Array.isArray(service.categories) ||
-              service.categories.length === 0) {
-            return true
-          }
-
-          // Case 3: All categories are hidden (only check if categories are configured)
-          if (configuredCategories.length > 0) {
-            const hasAnyVisibleCategory = service.categories.some(cat =>
-              visibleCategoryNames.has(cat)
-            )
-            return !hasAnyVisibleCategory
-          }
-
-          // If no categories configured yet, don't show in "Other"
-          return false
-        })
-      } else {
-        result = result.filter(service =>
-          service.categories &&
-          Array.isArray(service.categories) &&
-          service.categories.includes(selectedCategory)
-        )
-      }
+    let result = services
+    if (activeCategory === UNCATEGORIZED) {
+      result = result.filter(s => s.categoryIds.length === 0)
+    } else if (activeCategory !== ALL) {
+      result = result.filter(s => s.categoryIds.includes(activeCategory))
     }
 
-    // Sort alphabetically by name
-    result.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    const term = searchTerm.trim().toLowerCase()
+    if (term) result = result.filter(s => matchesSearch(s, term))
 
-    // Filter if search term exists
-    if (searchTerm.trim()) {
-      const lowerSearchTerm = searchTerm.toLowerCase()
-      result = result.filter(service => {
-        const nameMatch = service.name.toLowerCase().includes(lowerSearchTerm)
-        const urlMatch = service.url?.toLowerCase().includes(lowerSearchTerm)
-        return nameMatch || urlMatch
-      })
-    }
+    return [...result].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }, [services, activeCategory, searchTerm])
 
-    return result
-  }, [services, searchTerm, selectedCategory, categories])
+  const handleCategorySelect = useCallback((category) => setSelectedCategory(category), [])
+  const handleMenuToggle = useCallback(() => setIsMobileMenuOpen(prev => !prev), [])
+  const handleMenuClose = useCallback(() => setIsMobileMenuOpen(false), [])
 
   if (loading) {
     return (
@@ -279,7 +87,6 @@ function App() {
   if (error) {
     return (
       <div className="container">
-        <h1>Quick Access Dashboard</h1>
         <div className="error">
           <h2>Failed to load services</h2>
           <p>{error}</p>
@@ -291,35 +98,37 @@ function App() {
   return (
     <div className="app-layout">
       <Sidebar
-        categories={categories}
-        selectedCategory={selectedCategory}
+        items={navigation}
+        selectedCategory={activeCategory}
         onCategorySelect={handleCategorySelect}
         isOpen={isMobileMenuOpen}
         onClose={handleMenuClose}
-        customName={customName}
-        customIcon={customIcon}
+        customName={branding?.customName || DEFAULT_NAME}
+        customIcon={branding?.customIcon}
       />
       <div className="main-content">
         <div className="container">
           <Header
-            selectedCategory={selectedCategory}
+            title={activeLabel}
             onMenuToggle={handleMenuToggle}
             searchBar={
               services.length > 0 ? (
                 <SearchBar
-                  onSearch={handleSearch}
+                  onSearch={setSearchTerm}
                   totalServices={services.length}
-                  filteredCount={filteredServices.length}
                   filteredServices={filteredServices}
-                  baseUrl={baseUrl}
                 />
               ) : null
             }
           />
-          <ServicesGrid
-            services={filteredServices}
-            baseUrl={baseUrl}
-          />
+          {services.length === 0 ? (
+            <div className="no-results">
+              <h3>No services yet</h3>
+              <p>Add services or connect Nginx Proxy Manager in the admin panel (port 3001).</p>
+            </div>
+          ) : (
+            <ServicesGrid services={filteredServices} />
+          )}
         </div>
       </div>
     </div>
