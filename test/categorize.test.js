@@ -7,6 +7,7 @@ const cases = [
   [{ name: 'Plex' }, 'media'],
   [{ name: 'qBittorrent' }, 'downloads'],
   [{ name: 'Prowlarr' }, 'downloads'],
+  [{ name: 'Boxarr' }, 'media'],
   [{ name: 'Immich' }, 'photos'],
   [{ name: 'Home Assistant' }, 'home'],
   [{ name: 'Ha', hostnames: ['ha.example.com'] }, 'home'],

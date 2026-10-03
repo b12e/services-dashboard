@@ -27,6 +27,7 @@ export const BUILTIN_CATEGORIES = [
       'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr', 'whisparr', 'mylar', 'mylar3', 'kapowarr',
       'lazylibrarian', 'sickchill', 'sickgear', 'sickrage', 'medusa', 'couchpotato', 'headphones',
       'recyclarr', 'unpackerr', 'maintainerr', 'notifiarr', 'kometa', 'posterizarr', 'huntarr', 'cleanuparr',
+      'boxarr',
       'tdarr', 'unmanic', 'fileflows', 'handbrake',
       // Requests and stats
       'overseerr', 'jellyseerr', 'seerr', 'ombi', 'petio', 'requestrr', 'doplarr', 'wizarr',
