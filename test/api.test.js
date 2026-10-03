@@ -273,9 +273,10 @@ test('category management', async () => {
 })
 
 test('uploads are stored with a safe extension and served inert', async () => {
-  const form = new FormData()
-  form.append('icon', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'evil.html')
-  const response = await admin.request('POST', '/api/admin/upload/icon', { raw: form })
+  const response = await admin.request('POST', '/api/admin/upload/icon', {
+    raw: '<script>alert(1)</script>',
+    headers: { 'Content-Type': 'image/png' },
+  })
   assert.equal(response.status, 200)
   assert.match(response.json.iconPath, /^\/uploads\/custom-icon-\d+\.png$/)
 
@@ -283,9 +284,25 @@ test('uploads are stored with a safe extension and served inert', async () => {
   assert.match(served.headers.get('content-security-policy'), /sandbox/)
   assert.equal(served.headers.get('x-content-type-options'), 'nosniff')
 
-  const rejected = new FormData()
-  rejected.append('icon', new Blob(['<html>'], { type: 'text/html' }), 'evil.html')
-  assert.equal((await admin.request('POST', '/api/admin/upload/icon', { raw: rejected })).status, 400)
+  const html = await admin.request('POST', '/api/admin/upload/icon', { raw: '<html>', headers: { 'Content-Type': 'text/html' } })
+  assert.equal(html.status, 400)
+
+  const tooLarge = await admin.request('POST', '/api/admin/upload/icon', {
+    raw: Buffer.alloc(3 * 1024 * 1024),
+    headers: { 'Content-Type': 'image/png' },
+  })
+  assert.equal(tooLarge.status, 413)
+  assert.equal(tooLarge.json.error, 'File is larger than 2MB')
+})
+
+test('every state-changing route needs the CSRF token', async () => {
+  const client = new Client(admin.base)
+  await client.refreshCsrf()
+  const token = client.csrf
+  client.csrf = null
+  assert.equal((await client.request('POST', '/api/admin/auth/passkeys/login/options')).status, 403)
+  client.csrf = token
+  assert.notEqual((await client.request('POST', '/api/admin/auth/passkeys/login/options')).status, 403)
 })
 
 test('simple icons are served locally and readable on the dark theme', async () => {

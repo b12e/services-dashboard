@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import PropTypes from 'prop-types'
 import { isStandalone } from '../utils/links'
 
 /**
@@ -66,17 +65,6 @@ function ServiceCard({ service, animationDelay }) {
       </div>
     </a>
   )
-}
-
-ServiceCard.propTypes = {
-  service: PropTypes.shape({
-    name: PropTypes.string.isRequired,
-    href: PropTypes.string,
-    iconUrl: PropTypes.string,
-    fallbackInitials: PropTypes.string,
-    description: PropTypes.string
-  }).isRequired,
-  animationDelay: PropTypes.number.isRequired
 }
 
 export default ServiceCard

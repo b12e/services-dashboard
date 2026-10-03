@@ -7,13 +7,10 @@
 
 import express from 'express'
 import session from 'express-session'
-import cookieParser from 'cookie-parser'
-import { doubleCsrf } from 'csrf-csrf'
 import rateLimit from 'express-rate-limit'
 import crypto from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
-import multer from 'multer'
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -66,9 +63,15 @@ const SESSION_SECRET = process.env.SESSION_SECRET && process.env.SESSION_SECRET.
   ? process.env.SESSION_SECRET
   : crypto.createHash('sha256').update(process.env.SESSION_SECRET || crypto.randomBytes(32)).digest('hex')
 
-function safeEqual(a, b) {
-  const hash = value => crypto.createHash('sha256').update(String(value)).digest()
-  return crypto.timingSafeEqual(hash(a), hash(b))
+function safeEqual(input, expected) {
+  const a = Buffer.from(String(input))
+  const b = Buffer.from(String(expected))
+  if (a.length !== b.length) {
+    // Same amount of work as a real comparison, only the length leaks
+    crypto.timingSafeEqual(b, b)
+    return false
+  }
+  return crypto.timingSafeEqual(a, b)
 }
 
 function checkCredentials(username, password) {
@@ -132,21 +135,6 @@ const UPLOAD_TYPES = {
   'image/x-icon': '.ico',
   'image/vnd.microsoft.icon': '.ico',
 }
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      fs.mkdir(PATHS.uploads, { recursive: true }).then(() => cb(null, PATHS.uploads), error => cb(error))
-    },
-    // The extension comes from the validated type, never from the client's filename
-    filename: (req, file, cb) => cb(null, `custom-icon-${Date.now()}${UPLOAD_TYPES[file.mimetype]}`),
-  }),
-  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
-  fileFilter: (req, file, cb) => {
-    if (UPLOAD_TYPES[file.mimetype]) cb(null, true)
-    else cb(new Error('Only PNG, JPEG, GIF, WebP, AVIF, SVG and ICO images are allowed'))
-  },
-})
 
 /**
  * Remove uploaded icons that are no longer referenced by the config
@@ -220,7 +208,6 @@ export function createAdminApp() {
   setInterval(() => sessionStore.all(() => {}), 60 * 60 * 1000).unref()
 
   app.use(express.json({ limit: '1mb' }))
-  app.use(cookieParser())
   app.use(session({
     store: sessionStore,
     secret: SESSION_SECRET,
@@ -235,18 +222,19 @@ export function createAdminApp() {
     },
   }))
 
-  const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
-    getSecret: () => SESSION_SECRET,
-    getSessionIdentifier: (req) => {
-      // Touch the session so it is saved and keeps a stable id
-      if (req.session && !req.session.csrfInit) req.session.csrfInit = true
-      return req.sessionID || ''
-    },
-    cookieName: 'x-csrf-token',
-    cookieOptions: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' },
-    size: 64,
-    ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-    getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token'],
+  // CSRF: a random token per session, required on every request that
+  // changes something. The admin UI sends it in the x-csrf-token header.
+  const csrfToken = (req) => {
+    if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(32).toString('hex')
+    return req.session.csrfToken
+  }
+  app.use(function csrfProtection(req, res, next) {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
+    const provided = req.get('x-csrf-token')
+    if (req.session?.csrfToken && typeof provided === 'string' && safeEqual(provided, req.session.csrfToken)) {
+      return next()
+    }
+    res.status(403).json({ error: 'Invalid or missing CSRF token' })
   })
 
   // req.ip honours "trust proxy", so clients can not dodge limits by sending
@@ -277,17 +265,18 @@ export function createAdminApp() {
     res.status(401).json({ error: 'Authentication required' })
   }
 
-  app.use('/assets', express.static(path.join(ADMIN_DIST, 'assets'), { immutable: true, maxAge: '1y' }))
-  app.get('/icon.svg', (req, res) => res.sendFile(PUBLIC_ICON))
-  app.use('/uploads', serveUploads())
-  app.get(`${SIMPLE_ICON_ROUTE}/:file`, simpleIconHandler)
+  const staticRateLimiter = limiter(1000, 'Too many requests, please try again later.')
+  app.use('/assets', staticRateLimiter, express.static(path.join(ADMIN_DIST, 'assets'), { immutable: true, maxAge: '1y' }))
+  app.get('/icon.svg', staticRateLimiter, (req, res) => res.sendFile(PUBLIC_ICON))
+  app.use('/uploads', staticRateLimiter, serveUploads())
+  app.get(`${SIMPLE_ICON_ROUTE}/:file`, staticRateLimiter, simpleIconHandler)
 
   // ---------------------------------------------------------------------
   // Authentication
   // ---------------------------------------------------------------------
 
   app.get('/api/admin/csrf-token', apiRateLimiter, (req, res) => {
-    res.json({ csrfToken: generateCsrfToken(req, res) })
+    res.json({ csrfToken: csrfToken(req) })
   })
 
   app.get('/api/admin/auth/status', apiRateLimiter, (req, res) => {
@@ -297,7 +286,7 @@ export function createAdminApp() {
     })
   })
 
-  app.post('/api/admin/auth/login', authRateLimiter, doubleCsrfProtection, asyncRoute(async (req, res) => {
+  app.post('/api/admin/auth/login', authRateLimiter, asyncRoute(async (req, res) => {
     if (!AUTH_REQUIRED) return res.json({ success: true })
 
     const { username, password } = req.body || {}
@@ -311,7 +300,7 @@ export function createAdminApp() {
     res.json({ success: true })
   }, 'Login failed'))
 
-  app.post('/api/admin/auth/logout', apiRateLimiter, doubleCsrfProtection, (req, res) => {
+  app.post('/api/admin/auth/logout', apiRateLimiter, (req, res) => {
     req.session.destroy((error) => {
       if (error) return res.status(500).json({ error: 'Failed to logout' })
       res.json({ success: true })
@@ -328,7 +317,7 @@ export function createAdminApp() {
     res.json({ hasPasskeys: authData.passkeys.length > 0, count: authData.passkeys.length })
   }, 'Failed to check passkeys'))
 
-  app.post('/api/admin/auth/passkeys/register/options', authRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.post('/api/admin/auth/passkeys/register/options', authRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const { rpID } = getWebAuthnConfig(req)
     const authData = await loadAuthData()
 
@@ -349,7 +338,7 @@ export function createAdminApp() {
     res.json(options)
   }, 'Failed to generate registration options'))
 
-  app.post('/api/admin/auth/passkeys/register/verify', authRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.post('/api/admin/auth/passkeys/register/verify', authRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const { rpID, origin } = getWebAuthnConfig(req)
     const { credential, name } = req.body || {}
     const expectedChallenge = req.session.webauthnChallenge
@@ -392,7 +381,6 @@ export function createAdminApp() {
     res.json({ verified: true, name: passkeyName })
   }, 'Failed to verify registration'))
 
-  // WebAuthn has its own challenge/response, so no CSRF token is needed here
   app.post('/api/admin/auth/passkeys/login/options', authRateLimiter, asyncRoute(async (req, res) => {
     if (!AUTH_REQUIRED) return res.status(400).json({ error: 'Authentication is disabled' })
     const { rpID } = getWebAuthnConfig(req)
@@ -469,7 +457,7 @@ export function createAdminApp() {
     })))
   }, 'Failed to list passkeys'))
 
-  app.delete('/api/admin/auth/passkeys/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.delete('/api/admin/auth/passkeys/:id', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const removed = await withFileLock('auth', async () => {
       const authData = await loadAuthData()
       // Accept the credential id, or the list index used by older UIs
@@ -499,7 +487,7 @@ export function createAdminApp() {
     return ids.filter(id => known.has(id))
   }
 
-  app.post('/api/admin/services', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.post('/api/admin/services', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const { value, error } = sanitizeServiceInput(req.body)
     if (error) return res.status(400).json({ error })
 
@@ -515,7 +503,7 @@ export function createAdminApp() {
     res.status(201).json(service)
   }, 'Failed to add service'))
 
-  app.put('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.put('/api/admin/services/:id', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const serviceId = req.params.id
     const isNpm = serviceId.startsWith('npm:') || serviceId.startsWith('npm_')
     const { value, error } = sanitizeServiceInput(req.body, { npm: isNpm })
@@ -561,7 +549,7 @@ export function createAdminApp() {
     res.json({ id: npmOverrideKey(npmService.domain), ...override })
   }, 'Failed to update service'))
 
-  app.delete('/api/admin/services/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.delete('/api/admin/services/:id', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const serviceId = req.params.id
     const found = await withFileLock('data', async () => {
       const data = await loadServicesData()
@@ -601,7 +589,7 @@ export function createAdminApp() {
     return typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 60) : ''
   }
 
-  app.post('/api/admin/categories', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.post('/api/admin/categories', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const name = cleanCategoryName(req.body?.name)
     if (!name) return res.status(400).json({ error: 'Category name is required' })
 
@@ -618,7 +606,7 @@ export function createAdminApp() {
     res.status(result.status).json(result.body)
   }, 'Failed to create category'))
 
-  app.patch('/api/admin/categories/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.patch('/api/admin/categories/:id', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const result = await withFileLock('data', async () => {
       const registry = structuredClone(await loadRegistry())
       const category = registry.categories.find(c => c.id === req.params.id)
@@ -645,7 +633,7 @@ export function createAdminApp() {
     res.status(result.status).json(result.body)
   }, 'Failed to update category'))
 
-  app.delete('/api/admin/categories/:id', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.delete('/api/admin/categories/:id', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const id = req.params.id
     const found = await withFileLock('data', async () => {
       const registry = structuredClone(await loadRegistry())
@@ -670,7 +658,7 @@ export function createAdminApp() {
     res.json({ success: true })
   }, 'Failed to delete category'))
 
-  app.post('/api/admin/categories/restore-defaults', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.post('/api/admin/categories/restore-defaults', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const restored = await withFileLock('data', async () => {
       const registry = structuredClone(await loadRegistry())
       const count = restoreBuiltins(registry)
@@ -707,7 +695,7 @@ export function createAdminApp() {
     res.json(maskConfig(await loadConfig()))
   }, 'Failed to read configuration'))
 
-  app.put('/api/admin/config', writeRateLimiter, doubleCsrfProtection, requireAuth, asyncRoute(async (req, res) => {
+  app.put('/api/admin/config', writeRateLimiter, requireAuth, asyncRoute(async (req, res) => {
     const body = req.body || {}
     const config = await withFileLock('config', async () => {
       const stored = await loadConfig()
@@ -741,16 +729,22 @@ export function createAdminApp() {
     res.json({ config: maskConfig(config), validationResults, success: true })
   }, 'Failed to update configuration'))
 
-  app.post('/api/admin/upload/icon', writeRateLimiter, doubleCsrfProtection, requireAuth, (req, res) => {
-    upload.single('icon')(req, res, (error) => {
-      if (error) {
-        const message = error.code === 'LIMIT_FILE_SIZE' ? 'File is larger than 2MB' : error.message
-        return res.status(400).json({ error: message })
+  // The image is the raw request body, its type comes from Content-Type
+  app.post('/api/admin/upload/icon', writeRateLimiter, requireAuth,
+    express.raw({ type: Object.keys(UPLOAD_TYPES), limit: '2mb' }),
+    asyncRoute(async (req, res) => {
+      const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase()
+      if (!UPLOAD_TYPES[type] || !Buffer.isBuffer(req.body)) {
+        return res.status(400).json({ error: 'Only PNG, JPEG, GIF, WebP, AVIF, SVG and ICO images are allowed' })
       }
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
-      res.json({ success: true, iconPath: `/uploads/${req.file.filename}` })
-    })
-  })
+      if (req.body.length === 0) return res.status(400).json({ error: 'No file uploaded' })
+
+      // The extension comes from the validated type, never from the client
+      const filename = `custom-icon-${Date.now()}${UPLOAD_TYPES[type]}`
+      await fs.mkdir(PATHS.uploads, { recursive: true })
+      await fs.writeFile(path.join(PATHS.uploads, filename), req.body)
+      res.json({ success: true, iconPath: `/uploads/${filename}` })
+    }, 'Failed to upload icon'))
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
 
@@ -761,12 +755,13 @@ export function createAdminApp() {
     })
   })
 
-  // CSRF failures and other middleware errors as JSON
+  // Body parser and other middleware errors as JSON
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error)
     const status = error.status || error.statusCode || 500
     if (status >= 500) console.error('Admin server error:', error)
-    res.status(status).json({ error: status === 403 ? 'Invalid or missing CSRF token' : 'Request failed' })
+    const message = status === 413 ? 'File is larger than 2MB' : 'Request failed'
+    res.status(status).json({ error: message })
   })
 
   return app

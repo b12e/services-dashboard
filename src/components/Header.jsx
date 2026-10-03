@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 
 function Header({ searchBar, title, onMenuToggle }) {
   return (
@@ -26,12 +25,6 @@ function Header({ searchBar, title, onMenuToggle }) {
       </div>
     </div>
   )
-}
-
-Header.propTypes = {
-  searchBar: PropTypes.node,
-  title: PropTypes.string.isRequired,
-  onMenuToggle: PropTypes.func.isRequired
 }
 
 export default Header

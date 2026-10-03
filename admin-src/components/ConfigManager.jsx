@@ -84,9 +84,11 @@ function ConfigManager() {
 
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('icon', file)
-      const response = await fetchWithCsrf('/api/admin/upload/icon', { method: 'POST', body: formData })
+      const response = await fetchWithCsrf('/api/admin/upload/icon', {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || 'Upload failed')
       setConfig(prev => ({ ...prev, customIcon: result.iconPath }))

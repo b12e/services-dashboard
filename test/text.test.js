@@ -37,3 +37,10 @@ test('editDistance', () => {
   assert.equal(editDistance('jelyfin', 'jellyfin'), 1)
   assert.ok(editDistance('dashboard', 'grafana') > 2)
 })
+
+test('candidate generation stays fast on hostile input', () => {
+  const start = performance.now()
+  candidatesFor(`a${'9'.repeat(100000)}x`)
+  candidatesFor('a'.repeat(100000))
+  assert.ok(performance.now() - start < 200)
+})

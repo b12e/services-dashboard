@@ -16,7 +16,7 @@ Once logged in you can register passkeys (Face ID, Touch ID, Windows Hello, secu
 RP_ID=example.com ORIGIN=https://admin.example.com npm start
 ```
 
-API clients can use HTTP basic auth with the same credentials. Requests that change data also need a CSRF token from `GET /api/admin/csrf-token`, sent in the `x-csrf-token` header.
+API clients can use HTTP basic auth with the same credentials. Requests that change data also need a CSRF token from `GET /api/admin/csrf-token`, sent in the `x-csrf-token` header together with the session cookie from that response.
 
 ## Security Recommendations
 
@@ -56,7 +56,7 @@ Admin (port 3001, authentication required when enabled):
   (manual services have `svc_` ids, NPM services `npm:<domain>`; deleting an NPM service resets its customizations)
 - `GET|POST /api/admin/categories`, `PATCH|DELETE /api/admin/categories/:id`, `POST /api/admin/categories/restore-defaults`
 - `GET|PUT /api/admin/config` (NPM passwords are never returned; send an empty password to keep the stored one)
-- `POST /api/admin/upload/icon`
+- `POST /api/admin/upload/icon` (the image as the request body, with its `Content-Type`)
 - `GET /api/icons`, `GET /api/icons/preview/:name`
 
 ## Troubleshooting

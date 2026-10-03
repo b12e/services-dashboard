@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import ServiceCard from './ServiceCard'
 
 function ServicesGrid({ services }) {
@@ -40,10 +39,6 @@ function ServicesGrid({ services }) {
       ))}
     </div>
   )
-}
-
-ServicesGrid.propTypes = {
-  services: PropTypes.arrayOf(PropTypes.object).isRequired
 }
 
 export default ServicesGrid

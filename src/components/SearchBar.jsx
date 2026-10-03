@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import PropTypes from 'prop-types'
 import { openService } from '../utils/links'
 
 function SearchBar({ onSearch, totalServices, filteredServices }) {
@@ -78,12 +77,6 @@ function SearchBar({ onSearch, totalServices, filteredServices }) {
       )}
     </div>
   )
-}
-
-SearchBar.propTypes = {
-  onSearch: PropTypes.func.isRequired,
-  totalServices: PropTypes.number.isRequired,
-  filteredServices: PropTypes.arrayOf(PropTypes.object).isRequired
 }
 
 export default SearchBar

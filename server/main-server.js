@@ -6,6 +6,7 @@
  */
 
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import path from 'path'
 import { ROOT_DIR, PATHS } from './storage.js'
 import { loadConfig, brandingFrom } from './config.js'
@@ -37,6 +38,9 @@ export function createMainApp() {
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback, linklocal, uniquelocal')
+
+  // Generous, a dashboard load is a handful of requests plus one per icon
+  app.use(rateLimit({ windowMs: 60 * 1000, limit: 1000, standardHeaders: true, legacyHeaders: false }))
 
   // Everything the dashboard needs in one request
   app.get('/api/public/dashboard', async (req, res) => {

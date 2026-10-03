@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import PropTypes from 'prop-types'
 
 function Sidebar({ items, selectedCategory, onCategorySelect, isOpen, onClose, customName, customIcon }) {
   const sidebarRef = useRef(null)
@@ -56,20 +55,6 @@ function Sidebar({ items, selectedCategory, onCategorySelect, isOpen, onClose, c
       </aside>
     </>
   )
-}
-
-Sidebar.propTypes = {
-  items: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    count: PropTypes.number.isRequired
-  })).isRequired,
-  selectedCategory: PropTypes.string.isRequired,
-  onCategorySelect: PropTypes.func.isRequired,
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func,
-  customName: PropTypes.string,
-  customIcon: PropTypes.string
 }
 
 export default Sidebar

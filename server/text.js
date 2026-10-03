@@ -43,17 +43,23 @@ export function splitWords(str) {
     .filter(Boolean)
 }
 
+// A loop instead of /\d+$/, which backtracks badly on long digit runs
 function stripTrailingDigits(word) {
-  const stripped = word.replace(/\d+$/, '')
-  return stripped.length >= 3 ? stripped : word
+  let end = word.length
+  while (end > 0 && word.charCodeAt(end - 1) >= 48 && word.charCodeAt(end - 1) <= 57) end--
+  return end >= 3 ? word.slice(0, end) : word
 }
+
+// Names and hostnames are short, longer input is not worth matching
+const MAX_INPUT = 200
 
 /**
  * Generate lookup candidates for a free-form string, most specific first.
  * Each candidate has a normalized `key` and a `weight` (0..1) describing how
  * much of the original string it represents.
  */
-export function candidatesFor(str) {
+export function candidatesFor(input) {
+  const str = typeof input === 'string' ? input.slice(0, MAX_INPUT) : input
   const result = []
   const seen = new Set()
   const add = (key, weight, kind) => {
