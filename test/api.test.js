@@ -127,7 +127,7 @@ test('legacy data is migrated on startup', async () => {
 
   const services = JSON.parse(await fs.readFile(path.join(dataDir, 'services.json'), 'utf-8'))
   assert.ok(services.manualServices.every(s => /^svc_/.test(s.id)), 'manual services get stable ids')
-  assert.deepEqual(services.manualServices[1].categoryIds, [])
+  assert.equal(services.manualServices[1].categoryIds, undefined, 'a service that only had "Other" is automatic again')
 
   const config = JSON.parse(await fs.readFile(path.join(dataDir, 'config.json'), 'utf-8'))
   assert.equal(config.categories, undefined)
@@ -154,7 +154,8 @@ test('public dashboard', async () => {
   assert.ok(byName['TV Shows'].categoryIds.includes(media.id))
   assert.equal(media.serviceCount, 2)
   assert.equal(json.categories.find(c => c.name === 'Home Automation').serviceCount, 1)
-  assert.deepEqual(byName.Wiki.categoryIds, [], 'explicit "Other" stays uncategorized')
+  const productivity = json.categories.find(c => c.name === 'Productivity')
+  assert.deepEqual(byName.Wiki.categoryIds, [productivity.id], '"wiki" is now auto-detected')
 
   const text = JSON.stringify(json)
   assert.ok(!text.includes('npm-secret'))

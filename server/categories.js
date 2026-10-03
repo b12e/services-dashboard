@@ -84,7 +84,9 @@ function seedBuiltins(registry) {
  * including the inconsistent icon-metadata ones ("tools", "Developer-Tools",
  * "media", "Media-Servers", "Other", ...), and froze those into services
  * whenever a service was edited. This folds them into the built-ins:
- *   - "Other" is dropped (services without categories land there anyway)
+ *   - "Other" is dropped. Older versions saved whatever was auto-detected
+ *     when a service was edited, so a service that only had "Other" goes
+ *     back to automatic categorization
  *   - unconfigured categories that map to a built-in are merged into it
  *   - unconfigured, unreferenced categories are dropped
  *   - categories the user created, renamed or toggled are kept
@@ -231,7 +233,8 @@ export function migrateRegistry(stored, servicesData, configCategories = []) {
     const mapped = owner.categoryIds
       .map(id => (remap.has(id) ? remap.get(id) : id))
       .filter(id => id && validIds.has(id))
-    owner.categoryIds = [...new Set(mapped)]
+    if (mapped.length > 0) owner.categoryIds = [...new Set(mapped)]
+    else delete owner.categoryIds
   }
 
   return { registry, servicesData: services, changed: true, servicesChanged: true }

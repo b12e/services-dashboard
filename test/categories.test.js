@@ -67,7 +67,7 @@ test('legacy registry is folded into the built-ins', () => {
   const [plex, shop, misc, auto, legacyService] = servicesData.manualServices
   assert.deepEqual(plex.categoryIds, ['cat_media', 'cat_mine'])
   assert.deepEqual(shop.categoryIds, ['cat_ecom'])
-  assert.deepEqual(misc.categoryIds, [], '"Other" becomes an explicit empty list')
+  assert.equal(misc.categoryIds, undefined, 'only "Other" goes back to automatic')
   assert.equal(auto.categoryIds, undefined, 'an empty list used to mean auto')
   assert.deepEqual(legacyService.categoryIds, ['cat_media'])
   assert.equal(legacyService.category, undefined)
