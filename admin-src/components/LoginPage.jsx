@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
-import { fetchWithCsrf } from '../utils/csrf'
+import { api, clearCsrfToken } from '../utils/csrf'
 
-function LoginPage({ onLogin }) {
+function LoginPage({ onLogin, customName = 'Services Dashboard', customIcon }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -11,21 +11,15 @@ function LoginPage({ onLogin }) {
   const [passkeyLoading, setPasskeyLoading] = useState(false)
 
   useEffect(() => {
-    checkPasskeyAvailability()
+    api('/api/admin/auth/passkeys/available')
+      .then(data => setHasPasskeys(!!data.available))
+      .catch(() => setHasPasskeys(false))
   }, [])
 
-  async function checkPasskeyAvailability() {
-    try {
-      const response = await fetch('/api/admin/auth/passkeys/available')
-      if (response.ok) {
-        const data = await response.json()
-        setHasPasskeys(data.available)
-      } else {
-        setHasPasskeys(false)
-      }
-    } catch {
-      setHasPasskeys(false)
-    }
+  function loggedIn() {
+    // The server starts a new session on login, the old CSRF token is void
+    clearCsrfToken()
+    onLogin()
   }
 
   async function handlePasswordLogin(e) {
@@ -34,20 +28,10 @@ function LoginPage({ onLogin }) {
     setError('')
 
     try {
-      const response = await fetchWithCsrf('/api/admin/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      })
-
-      if (response.ok) {
-        onLogin()
-      } else {
-        const data = await response.json()
-        setError(data.error || 'Login failed')
-      }
+      await api('/api/admin/auth/login', { method: 'POST', body: { username, password } })
+      loggedIn()
     } catch (err) {
-      setError('Network error. Please try again.')
+      setError(err.message || 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -58,33 +42,10 @@ function LoginPage({ onLogin }) {
     setError('')
 
     try {
-      // Get authentication options
-      const optionsResponse = await fetch('/api/admin/auth/passkeys/login/options', {
-        method: 'POST'
-      })
-
-      if (!optionsResponse.ok) {
-        throw new Error('Failed to get authentication options')
-      }
-
-      const options = await optionsResponse.json()
-
-      // Start authentication
-      const credential = await startAuthentication(options)
-
-      // Verify authentication
-      const verifyResponse = await fetch('/api/admin/auth/passkeys/login/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential })
-      })
-
-      if (verifyResponse.ok) {
-        onLogin()
-      } else {
-        const data = await verifyResponse.json()
-        setError(data.error || 'Passkey authentication failed')
-      }
+      const options = await api('/api/admin/auth/passkeys/login/options', { method: 'POST' })
+      const credential = await startAuthentication({ optionsJSON: options })
+      await api('/api/admin/auth/passkeys/login/verify', { method: 'POST', body: { credential } })
+      loggedIn()
     } catch (err) {
       console.error('Passkey login error:', err)
       setError(err.message || 'Passkey authentication failed')
@@ -97,18 +58,20 @@ function LoginPage({ onLogin }) {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <img src="/icon.svg" alt="Logo" className="login-logo" />
-          <h1>Services Dashboard</h1>
-          <p>Management Tool</p>
+          <img src={customIcon || '/icon.svg'} alt="Logo" className="login-logo" />
+          <h1>{customName}</h1>
+          <p>Management</p>
         </div>
 
         {error && <div className="login-error">{error}</div>}
 
         <form onSubmit={handlePasswordLogin} className="login-form">
           <div className="form-group">
-            <label>Username</label>
+            <label htmlFor="login-username">Username</label>
             <input
+              id="login-username"
               type="text"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -117,9 +80,11 @@ function LoginPage({ onLogin }) {
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label htmlFor="login-password">Password</label>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -137,11 +102,7 @@ function LoginPage({ onLogin }) {
               <span>OR</span>
             </div>
 
-            <button
-              onClick={handlePasskeyLogin}
-              disabled={passkeyLoading}
-              className="btn-passkey"
-            >
+            <button onClick={handlePasskeyLogin} disabled={passkeyLoading} className="btn-passkey">
               {passkeyLoading ? 'Authenticating...' : 'Login with Passkey'}
             </button>
           </>

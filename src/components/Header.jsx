@@ -1,9 +1,5 @@
-import PropTypes from 'prop-types'
-import { formatCategoryName } from '../utils/formatCategory'
 
-function Header({ searchBar, selectedCategory, onMenuToggle }) {
-  const categoryDisplay = selectedCategory === 'all' ? 'All Services' : formatCategoryName(selectedCategory)
-
+function Header({ searchBar, title, onMenuToggle }) {
   return (
     <div className="header">
       <div className="header-content">
@@ -23,18 +19,12 @@ function Header({ searchBar, selectedCategory, onMenuToggle }) {
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <h1>{categoryDisplay}</h1>
+          <h1>{title}</h1>
         </div>
         {searchBar && <div className="header-right">{searchBar}</div>}
       </div>
     </div>
   )
-}
-
-Header.propTypes = {
-  searchBar: PropTypes.node,
-  selectedCategory: PropTypes.string.isRequired,
-  onMenuToggle: PropTypes.func.isRequired
 }
 
 export default Header

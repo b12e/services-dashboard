@@ -1,8 +1,6 @@
-import PropTypes from 'prop-types'
 import ServiceCard from './ServiceCard'
 
-function ServicesGrid({ services, baseUrl }) {
-
+function ServicesGrid({ services }) {
   if (services.length === 0) {
     return (
       <div className="no-results">
@@ -34,19 +32,13 @@ function ServicesGrid({ services, baseUrl }) {
     <div className={`services-grid hide-urls ${hasDescriptions ? 'has-descriptions' : ''}`}>
       {services.map((service, index) => (
         <ServiceCard
-          key={`${service.name}-${index}`}
+          key={service.id}
           service={service}
-          baseUrl={baseUrl}
           animationDelay={Math.min(index * 0.05, 1.5)}
         />
       ))}
     </div>
   )
-}
-
-ServicesGrid.propTypes = {
-  services: PropTypes.arrayOf(PropTypes.object).isRequired,
-  baseUrl: PropTypes.string
 }
 
 export default ServicesGrid

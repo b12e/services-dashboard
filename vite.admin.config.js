@@ -12,8 +12,8 @@ export default defineConfig({
       closeBundle() {
         // Copy icon.svg from public to admin-dist after build
         copyFileSync(
-          resolve(__dirname, 'public/icon.svg'),
-          resolve(__dirname, 'admin-dist/icon.svg')
+          resolve(import.meta.dirname, 'public/icon.svg'),
+          resolve(import.meta.dirname, 'admin-dist/icon.svg')
         )
       }
     }

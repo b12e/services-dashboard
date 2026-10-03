@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import PropTypes from 'prop-types'
+import { openService } from '../utils/links'
 
-function SearchBar({ onSearch, totalServices, filteredCount, filteredServices, baseUrl }) {
+function SearchBar({ onSearch, totalServices, filteredServices }) {
   const [searchTerm, setSearchTerm] = useState('')
   const inputRef = useRef(null)
 
@@ -14,37 +14,11 @@ function SearchBar({ onSearch, totalServices, filteredCount, filteredServices, b
     onSearch(searchTerm)
   }, [searchTerm, onSearch])
 
-  const handleClear = () => {
-    setSearchTerm('')
-  }
-
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && filteredCount === 1 && filteredServices.length === 1) {
-      const service = filteredServices[0]
-      const shouldAppendBase = service.appendBaseDomain !== false
-
-      let finalUrl
-      try {
-        if (shouldAppendBase && baseUrl) {
-          finalUrl = service.url
-            ? `https://${service.url}.${baseUrl}`
-            : `https://${baseUrl}`
-        } else {
-          if (!service.url) {
-            finalUrl = baseUrl ? `https://${baseUrl}` : null
-          } else {
-            finalUrl = service.url.match(/^https?:\/\//)
-              ? service.url
-              : `https://${service.url}`
-          }
-        }
-
-        if (finalUrl) {
-          window.open(finalUrl, '_blank', 'noopener,noreferrer')
-        }
-      } catch (error) {
-        console.error('Error opening service URL:', error)
-      }
+    if (e.key === 'Enter' && filteredServices.length === 1) {
+      openService(filteredServices[0])
+    } else if (e.key === 'Escape') {
+      setSearchTerm('')
     }
   }
 
@@ -77,7 +51,7 @@ function SearchBar({ onSearch, totalServices, filteredCount, filteredServices, b
         {searchTerm && (
           <button
             className="search-clear"
-            onClick={handleClear}
+            onClick={() => setSearchTerm('')}
             aria-label="Clear search"
             type="button"
           >
@@ -98,19 +72,11 @@ function SearchBar({ onSearch, totalServices, filteredCount, filteredServices, b
       </div>
       {searchTerm && (
         <div className="search-results-count">
-          Showing {filteredCount} of {totalServices} services
+          Showing {filteredServices.length} of {totalServices} services
         </div>
       )}
     </div>
   )
-}
-
-SearchBar.propTypes = {
-  onSearch: PropTypes.func.isRequired,
-  totalServices: PropTypes.number.isRequired,
-  filteredCount: PropTypes.number.isRequired,
-  filteredServices: PropTypes.arrayOf(PropTypes.object).isRequired,
-  baseUrl: PropTypes.string
 }
 
 export default SearchBar

@@ -1,70 +1,46 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy source files
 COPY . .
+RUN npm run build && npm run admin:build
 
-# Build the main application
-RUN npm run build
-
-# Build the admin UI
-RUN npm run admin:build
+# Bundle the dashboard-icons metadata so icon matching works offline.
+# The server refreshes it weekly at runtime (ICON_METADATA_REFRESH=false disables that).
+RUN mkdir -p server/vendor && node -e " \
+  fetch('https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json', { signal: AbortSignal.timeout(60000) }) \
+    .then(r => r.json()) \
+    .then(d => { if (Object.keys(d).length < 100) throw new Error('unexpected metadata'); \
+                 require('fs').writeFileSync('server/vendor/dashboard-icons-metadata.json', JSON.stringify(d)) }) \
+    .catch(e => console.warn('WARNING: could not download icon metadata:', e.message))"
 
 # Production stage
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
-# Install curl for downloading metadata
-RUN apk add --no-cache curl
-
-# Copy package files for production dependencies
 COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Copy built files from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/admin-dist ./admin-dist
+COPY --from=build /app/server ./server
+COPY public/icon.svg ./public/icon.svg
+COPY admin-server.js docker-start.sh ./
+RUN chmod +x ./docker-start.sh && mkdir -p /app/data
 
-# Copy server files
-COPY server ./server
-COPY admin-server.js ./admin-server.js
-
-# Copy public directory for services.json
-COPY public ./public
-
-# Download dashboard-icons metadata and store in container
-RUN curl -fsSL https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json \
-    -H "Accept: application/json" \
-    -o ./dist/dashboard-icons-metadata.json && \
-    # Verify it's valid JSON (should start with { or [), fallback to empty object if not
-    (cat ./dist/dashboard-icons-metadata.json | head -c 1 | grep -qE '[\[{]' || \
-    echo '{}' > ./dist/dashboard-icons-metadata.json)
-
-# Expose ports 3000 (main app) and 3001 (admin panel)
-EXPOSE 3000 3001
-
-# Create data directory for persistent configuration
-RUN mkdir -p /app/data
-
-# Set environment variables
 ENV PORT=3000
 ENV ADMIN_PORT=3001
 ENV DATA_DIR=/app/data
 
-# Copy startup script
-COPY docker-start.sh ./docker-start.sh
-RUN chmod +x ./docker-start.sh
+# Dashboard and admin panel
+EXPOSE 3000 3001
 
-# Start both servers
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/branding').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
 CMD ["./docker-start.sh"]

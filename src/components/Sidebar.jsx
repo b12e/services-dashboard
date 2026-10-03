@@ -1,34 +1,24 @@
 import { useEffect, useRef } from 'react'
-import PropTypes from 'prop-types'
-import { formatCategoryName } from '../utils/formatCategory'
 
-function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClose, customName, customIcon }) {
+function Sidebar({ items, selectedCategory, onCategorySelect, isOpen, onClose, customName, customIcon }) {
   const sidebarRef = useRef(null)
 
   const handleCategoryClick = (category) => {
     onCategorySelect(category)
-    if (onClose) {
-      onClose()
-    }
+    onClose?.()
   }
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Only handle on mobile when sidebar is open
       if (!isOpen || window.innerWidth > 768) return
-
-      // Check if click is outside sidebar
       if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
         onClose?.()
       }
     }
 
-    // Add event listener
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('touchstart', handleClickOutside)
-
-    // Cleanup
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
@@ -40,50 +30,31 @@ function Sidebar({ categories, selectedCategory, onCategorySelect, isOpen, onClo
       {isOpen && <div className="sidebar-overlay" onClick={onClose}></div>}
       <aside ref={sidebarRef} className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-content">
-        <div className="sidebar-header">
-          <img src={customIcon || "/icon.svg"} alt="Logo" className="sidebar-logo" />
-          <h1 className="sidebar-brand">{customName || 'Quick Access'}</h1>
-        </div>
-        <h2 className="sidebar-title">Categories</h2>
-        <nav className="sidebar-nav">
-          <button
-            className={`sidebar-item ${selectedCategory === 'all' ? 'active' : ''}`}
-            onClick={() => handleCategoryClick('all')}
-          >
-            <span className="sidebar-item-label">{categories.displayNames?.all || 'All Services'}</span>
-            <span className="sidebar-item-count">{categories.counts?.all || 0}</span>
-          </button>
-          {Object.entries(categories.counts || {})
-            .filter(([key]) => key !== 'all')
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([category, count]) => (
+          <div className="sidebar-header">
+            <img src={customIcon || '/icon.svg'} alt="Logo" className="sidebar-logo" />
+            <h1 className="sidebar-brand">{customName}</h1>
+          </div>
+          <h2 className="sidebar-title">Categories</h2>
+          <nav className="sidebar-nav">
+            {items.map(item => (
               <button
-                key={category}
-                className={`sidebar-item ${selectedCategory === category ? 'active' : ''}`}
-                onClick={() => handleCategoryClick(category)}
+                key={item.id}
+                className={`sidebar-item ${selectedCategory === item.id ? 'active' : ''}`}
+                onClick={() => handleCategoryClick(item.id)}
+                aria-current={selectedCategory === item.id ? 'page' : undefined}
               >
-                <span className="sidebar-item-label">{categories.displayNames?.[category] || formatCategoryName(category)}</span>
-                <span className="sidebar-item-count">{count}</span>
+                <span className="sidebar-item-label">{item.name}</span>
+                <span className="sidebar-item-count">{item.count}</span>
               </button>
             ))}
-        </nav>
-        <div className="sidebar-footer">
-          <p>&copy; {new Date().getFullYear()} b12e</p>
+          </nav>
+          <div className="sidebar-footer">
+            <p>&copy; {new Date().getFullYear()} b12e</p>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
     </>
   )
-}
-
-Sidebar.propTypes = {
-  categories: PropTypes.object.isRequired,
-  selectedCategory: PropTypes.string.isRequired,
-  onCategorySelect: PropTypes.func.isRequired,
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func,
-  customName: PropTypes.string,
-  customIcon: PropTypes.string
 }
 
 export default Sidebar

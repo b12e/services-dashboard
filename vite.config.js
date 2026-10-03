@@ -1,80 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+
+// In development, API calls go to the dashboard server (npm start)
+const apiTarget = process.env.API_TARGET || 'http://localhost:3000'
 
 export default defineConfig({
   server: {
     proxy: {
-      '/services.json': {
-        target: 'https://dashboard.local.b12e.es',
-        changeOrigin: true,
-        secure: false
-      },
-      '/configuration.json': {
-        target: 'https://dashboard.local.b12e.es',
-        changeOrigin: true,
-        secure: false
-      }
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/uploads': { target: apiTarget, changeOrigin: true },
     }
   },
-  plugins: [
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
-      manifest: {
-        name: 'Services Dashboard',
-        short_name: 'Services',
-        description: 'Personal services quick access dashboard',
-        theme_color: '#0f0f0f',
-        background_color: '#0f0f0f',
-        display: 'standalone',
-        icons: [
-          {
-            src: 'icon.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml'
-          },
-          {
-            src: 'icon.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml'
-          }
-        ]
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/gh\/homarr-labs\/dashboard-icons\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'dashboard-icons-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/simple-icons@latest\/icons\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'simple-icons-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
-    })
-  ]
+  plugins: [react()]
 })

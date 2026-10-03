@@ -1,0 +1,29 @@
+{
+  "manualServices": [
+    {
+      "name": "Plex",
+      "url": "plex",
+      "appendBaseDomain": true,
+      "icon": "plex"
+    },
+    {
+      "name": "Router",
+      "url": "http://192.168.1.1",
+      "appendBaseDomain": false,
+      "icon": "si:ubiquiti",
+      "description": "UniFi gateway"
+    },
+    {
+      "name": "Notes",
+      "url": "https://notes.example.com",
+      "appendBaseDomain": false,
+      "categoryIds": []
+    }
+  ],
+  "overrides": {
+    "npm:sonarr.example.com": {
+      "name": "TV Shows",
+      "hidden": false
+    }
+  }
+}

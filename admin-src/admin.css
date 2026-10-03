@@ -1015,15 +1015,6 @@ button:disabled {
   vertical-align: middle;
 }
 
-/* Make simple-icons SVGs white instead of black */
-.service-icon-preview[src*="simple-icons"],
-.icon-preview-input[src*="simple-icons"],
-.icon-suggestion-preview[src*="simple-icons"],
-.icon-grid-img[src*="simple-icons"],
-.services-table .icon-cell img[src*="simple-icons"] {
-  filter: brightness(0) invert(1);
-}
-
 .config-footer {
   margin-top: 2rem;
   padding-top: 1.5rem;
@@ -1709,4 +1700,62 @@ select {
 select:focus {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(74,158,255,0.2);
+}
+
+/* Category metadata row */
+.category-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.category-meta .category-badge,
+.category-meta .category-status {
+  margin: 0;
+}
+
+/* Icon picker items are buttons */
+button.icon-grid-item {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.icon-grid-item.selected {
+  border-color: var(--accent-blue);
+}
+
+/* Auto-detected icon shown faded until the user picks one */
+.icon-preview-auto {
+  opacity: 0.6;
+}
+
+.auto-hint {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+}
+
+.link-button:hover:not(:disabled) {
+  background: none;
+}
+
+.category-browser-item.hidden-category {
+  opacity: 0.6;
+}
+
+.error-text {
+  color: var(--accent-red);
 }
