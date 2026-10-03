@@ -15,7 +15,7 @@
     "admin:dev": "vite --config vite.admin.config.js",
     "admin:build": "vite build --config vite.admin.config.js",
     "admin:server": "node admin-server.js",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.2.2",
